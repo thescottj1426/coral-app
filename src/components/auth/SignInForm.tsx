@@ -48,11 +48,13 @@ export function SignInForm() {
         email: values.email,
         password: values.password,
         rememberMe: values.rememberMe,
+        callbackURL: '/collection',
       });
       if (result.error) {
         setError(result.error.message ?? 'Invalid email or password');
       } else {
         router.push('/collection');
+        router.refresh();
       }
     } finally {
       setLoading(false);

@@ -53,12 +53,14 @@ export function SignUpForm() {
       const result = await signUp.email({
         email: values.email,
         password: values.password,
-        name: values.username, // Better Auth uses `name`; we store it as username via databaseHooks
+        name: values.username,
+        callbackURL: '/collection',
       });
       if (result.error) {
         setError(result.error.message ?? 'Something went wrong');
       } else {
         router.push('/collection');
+        router.refresh();
       }
     } finally {
       setLoading(false);
