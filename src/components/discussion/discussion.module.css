@@ -1,0 +1,217 @@
+/* ============================================================
+   Object-Anchored Discussion — component styles
+   Matches mantine-mock-discuss.css exactly.
+   ============================================================ */
+
+/* ---- anchor chip ---- */
+.anchor {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 9px 0 6px;
+  background: var(--mantine-color-body);
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: 999px;
+  font-size: 12px;
+  max-width: 100%;
+  vertical-align: middle;
+  text-decoration: none;
+  color: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.anchorIc { display: inline-flex; flex: none; align-items: center; }
+.anchorName { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.anchorCode { font-family: var(--font-ibm-plex-mono), monospace; font-size: 10.5px; color: var(--mantine-color-dimmed); flex: none; }
+.anchorThumb { width: 16px; height: 16px; border-radius: 4px; flex: none; }
+
+/* ---- anchor card ---- */
+.anchorCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px 11px 13px;
+  border: 1px solid var(--mantine-color-default-border);
+  border-left: 3px solid var(--ac, var(--mantine-primary-color-filled));
+  border-radius: var(--mantine-radius-md);
+  background: var(--mantine-color-gray-0);
+}
+.anchorCardEyebrow {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ac, var(--mantine-color-dimmed));
+  font-weight: 500;
+}
+.anchorTile {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--mantine-radius-sm);
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---- thread-type badge ---- */
+.tbadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ---- thread row ---- */
+.thread {
+  display: block;
+  padding: 13px 12px;
+  border-radius: var(--mantine-radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+}
+.thread:hover { background: var(--mantine-color-gray-0); border-color: var(--mantine-color-default-border); }
+.threadInner { display: flex; gap: 12px; align-items: flex-start; }
+.threadTitle { font-size: 14px; font-weight: 600; line-height: 1.35; }
+.threadSnip { font-size: 12.5px; color: var(--mantine-color-dimmed); margin-top: 2px; line-height: 1.45; }
+.threadMeta { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--mantine-color-dimmed); flex-wrap: wrap; }
+.threadRep {
+  flex: none; width: 46px; min-height: 46px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  color: var(--mantine-color-dimmed);
+}
+.threadRepSolved { color: var(--mantine-color-teal-6); }
+.threadRepCount { font-size: 16px; font-weight: 700; line-height: 1; color: var(--mantine-color-gray-8); }
+.threadRepCountSolved { font-size: 16px; font-weight: 700; line-height: 1; color: var(--mantine-color-teal-6); }
+.unreadDot { width: 8px; height: 8px; border-radius: 50%; background: var(--mantine-primary-color-filled); flex: none; }
+
+/* ---- replies ---- */
+.reply {
+  display: flex;
+  gap: 11px;
+  padding: 14px 0;
+  border-top: 1px solid var(--mantine-color-default-border);
+}
+.replyBest {
+  display: flex;
+  gap: 11px;
+  background: var(--mantine-color-teal-0);
+  border: 1px solid color-mix(in oklab, var(--mantine-color-teal-6) 30%, transparent);
+  border-radius: var(--mantine-radius-md);
+  padding: 12px;
+  margin: 6px 0;
+}
+.rBody { flex: 1; min-width: 0; }
+.rHead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rText { font-size: 13.5px; color: var(--mantine-color-gray-8); margin-top: 4px; line-height: 1.55; }
+.rActs { display: flex; gap: 14px; margin-top: 8px; font-size: 12px; font-weight: 600; color: var(--mantine-color-dimmed); }
+.rActs span { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+.bestTag {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 700;
+  color: var(--mantine-color-teal-7);
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+
+/* ---- photo-pin anchoring ---- */
+.pinPhoto {
+  position: relative;
+  border-radius: var(--mantine-radius-lg);
+  overflow: hidden;
+  background: var(--mantine-color-gray-1);
+}
+.pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--mantine-primary-color-filled);
+  color: var(--mantine-primary-color-filled);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,.35);
+  z-index: 2;
+  user-select: none;
+}
+.pinActive {
+  background: var(--mantine-primary-color-filled);
+  color: #fff;
+  transform: translate(-50%, -50%) scale(1.15);
+  z-index: 3;
+}
+.pinSolved { border-color: var(--mantine-color-teal-6); color: var(--mantine-color-teal-6); }
+.pinGhost {
+  border-style: dashed;
+  background: rgba(255,255,255,.7);
+  animation: pinpulse 1.6s ease-in-out infinite;
+}
+@keyframes pinpulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(47,102,204,.45); }
+  50%      { box-shadow: 0 0 0 7px rgba(47,102,204,0); }
+}
+.pinItem {
+  display: flex; gap: 10px; padding: 11px;
+  border-radius: var(--mantine-radius-md);
+  border: 1px solid var(--mantine-color-default-border);
+  cursor: pointer; align-items: flex-start;
+}
+.pinItemActive {
+  border-color: var(--mantine-primary-color-filled);
+  background: var(--mantine-color-ocean-0);
+  box-shadow: inset 0 0 0 1px var(--mantine-primary-color-filled);
+}
+.pinNum {
+  width: 22px; height: 22px; border-radius: 50%; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 800;
+  background: var(--mantine-primary-color-filled); color: #fff;
+}
+.pinNumSolved { background: var(--mantine-color-teal-6); }
+
+/* ---- anchor-type option (discuss hub sidebar + compose picker) ---- */
+/* ---- anchor-type cards (discuss hub sidebar + compose picker) ---- */
+.atypeOpt {
+  display: flex; align-items: flex-start; gap: 12px; padding: 13px 13px;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+  cursor: pointer; background: var(--mantine-color-body);
+  font-family: inherit; width: 100%; text-align: left;
+  transition: border-color 80ms, background 80ms, box-shadow 80ms;
+}
+.atypeOpt:hover { background: var(--mantine-color-gray-0); border-color: var(--mantine-color-gray-4); }
+.atypeOptActive {
+  border-color: var(--ac-ink, var(--mantine-primary-color-filled));
+  background: var(--ac-wash, var(--mantine-color-ocean-0));
+  box-shadow: inset 0 0 0 1px var(--ac-ink, var(--mantine-primary-color-filled));
+}
+.atypeOptActive:hover { background: var(--ac-wash, var(--mantine-color-ocean-0)); }
+.atypeIcBox {
+  width: 38px; height: 38px; border-radius: var(--mantine-radius-md);
+  flex: none; display: flex; align-items: center; justify-content: center;
+  margin-top: 1px;
+}
+.atypeCount {
+  margin-left: auto; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 22px; height: 20px; padding: 0 6px;
+  border-radius: 10px;
+  background: var(--mantine-color-gray-1);
+  color: var(--mantine-color-dimmed);
+  font-size: 11px; font-weight: 700;
+}
+.atypeCountActive {
+  background: var(--ac-ink, var(--mantine-primary-color-filled)); color: #fff;
+}

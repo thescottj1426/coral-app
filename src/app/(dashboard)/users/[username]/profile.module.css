@@ -1,0 +1,350 @@
+/* Profile page — Reef Lab direction */
+
+.cover {
+  height: 150px;
+  position: relative;
+  border-radius: var(--mantine-radius-lg) var(--mantine-radius-lg) 0 0;
+  overflow: hidden;
+}
+
+.editCoverBtn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--mantine-radius-md);
+  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 0;
+}
+
+.identity {
+  padding: 0 24px 18px;
+  display: flex;
+  gap: 18px;
+  align-items: flex-end;
+  margin-top: -44px;
+}
+
+.avatar {
+  width: 110px;
+  height: 110px;
+  border-radius: 28px;
+  flex: none;
+  border: 4px solid var(--mantine-color-body);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-family: var(--font-sora, sans-serif);
+  font-weight: 700;
+  font-size: 38px;
+  position: relative;
+  box-shadow: 0 0 0 2px var(--mantine-color-ocean-4);
+}
+
+.identityMain {
+  flex: 1;
+  min-width: 0;
+  padding-bottom: 4px;
+}
+
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.name {
+  font-family: var(--font-sora, sans-serif);
+  font-weight: 700;
+  font-size: 24px;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.handle {
+  color: var(--mantine-color-dimmed);
+  font-size: 14px;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--mantine-color-dimmed);
+  flex-wrap: wrap;
+}
+
+.metaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex: none;
+  padding-bottom: 4px;
+}
+
+/* stat bar */
+.statsBar {
+  display: flex;
+  border-top: 1px solid var(--mantine-color-default-border);
+}
+
+.stat {
+  flex: 1;
+  padding: 12px 16px;
+  text-align: center;
+  border-right: 1px solid var(--mantine-color-default-border);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.stat:last-child {
+  border-right: 0;
+}
+
+.stat:hover {
+  background: var(--mantine-color-gray-0);
+}
+
+.statValue {
+  font-family: var(--font-sora, sans-serif);
+  font-weight: 700;
+  font-size: 20px;
+  line-height: 1.1;
+}
+
+.statLabel {
+  font-size: 12px;
+  color: var(--mantine-color-dimmed);
+  margin-top: 1px;
+}
+
+/* membership row */
+.memberRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--mantine-radius-md);
+  border: 1px solid var(--mantine-color-default-border);
+}
+
+.memberIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--mantine-radius-md);
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+/* collection grid */
+.colCard {
+  position: relative;
+  border-radius: var(--mantine-radius-md);
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.colImg {
+  height: 120px;
+}
+
+.colGen {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
+.colCap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 16px 9px 8px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.72));
+  color: #fff;
+}
+
+.colName {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.colCode {
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 9.5px;
+  opacity: 0.85;
+}
+
+/* bloodline card */
+.bloodlineCard {
+  display: flex;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+  align-items: center;
+}
+
+.thumbStack {
+  display: flex;
+  flex: none;
+}
+
+.thumbStack > * {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 2px solid var(--mantine-color-body);
+  flex: none;
+}
+
+.thumbStack > * + * {
+  margin-left: -12px;
+}
+
+.bloodlineStat {
+  text-align: center;
+  flex: none;
+}
+
+.bloodlineStatValue {
+  font-family: var(--font-sora, sans-serif);
+  font-weight: 700;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.bloodlineStatLabel {
+  font-size: 10.5px;
+  color: var(--mantine-color-dimmed);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* reputation */
+.repScore {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.repNum {
+  font-family: var(--font-sora, sans-serif);
+  font-weight: 700;
+  font-size: 40px;
+  line-height: 1;
+}
+
+.stars {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.repBarRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--mantine-color-dimmed);
+}
+
+.repBar {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--mantine-color-gray-2);
+  overflow: hidden;
+}
+
+.repBarFill {
+  display: block;
+  height: 100%;
+  background: var(--mantine-color-yellow-5);
+}
+
+.review {
+  display: flex;
+  gap: 11px;
+  padding: 13px 0;
+  border-top: 1px solid var(--mantine-color-default-border);
+}
+
+/* badges */
+.badgeTile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  text-align: center;
+  padding: 14px 8px;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+}
+
+.badgeEmoji {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.badgeName {
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+/* mutuals */
+.mutualFaces {
+  display: flex;
+}
+
+.mutualFaces > * + * {
+  margin-left: -8px;
+}
+
+.mutualFace {
+  border: 2px solid var(--mantine-color-body);
+  border-radius: 50%;
+}
+
+/* eyebrow label */
+.eyebrow {
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--mantine-color-dimmed);
+  font-weight: 500;
+}

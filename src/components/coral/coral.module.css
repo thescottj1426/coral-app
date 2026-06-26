@@ -1,0 +1,220 @@
+/* ── Category badge ──────────────────────────────────────── */
+.catSps     { background: var(--fb-cat-sps-bg)     !important; color: var(--fb-cat-sps)     !important; }
+.catLps     { background: var(--fb-cat-lps-bg)     !important; color: var(--fb-cat-lps)     !important; }
+.catSoftie  { background: var(--fb-cat-softie-bg)  !important; color: var(--fb-cat-softie)  !important; }
+.catZoa     { background: var(--fb-cat-zoa-bg)     !important; color: var(--fb-cat-zoa)     !important; }
+.catAnemone { background: var(--fb-cat-anemone-bg) !important; color: var(--fb-cat-anemone) !important; }
+.catOther   { background: #f1f3f5 !important; color: #495057 !important; }
+
+/* ── Lineage list (sidebar rail) ─────────────────────────── */
+.linList {
+  display: flex;
+  flex-direction: column;
+}
+
+.linRow {
+  display: flex;
+  gap: 0;
+}
+
+.linRail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 18px;
+  flex-shrink: 0;
+  margin-right: 10px;
+}
+
+.linDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mantine-color-gray-4);
+  flex-shrink: 0;
+  margin-top: 14px;
+}
+
+.linDotYou {
+  background: var(--mantine-color-ocean-6);
+}
+
+.linStem {
+  flex: 1;
+  width: 2px;
+  background: var(--mantine-color-gray-3);
+  margin-top: 2px;
+  min-height: 10px;
+}
+
+.linNode {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: var(--fb-radius);
+  margin-bottom: 4px;
+}
+
+.linNodeYou {
+  background: var(--mantine-color-ocean-0);
+  outline: 1px solid var(--mantine-color-ocean-3);
+}
+
+.linGenLabel {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--mantine-color-dimmed);
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+/* ── Pedigree tree ───────────────────────────────────────── */
+.treeRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: var(--fb-radius);
+  min-height: 52px;
+}
+
+.treeRowYou {
+  background: var(--mantine-color-ocean-0);
+  outline: 1px solid var(--mantine-color-ocean-3);
+}
+
+.treeGhost {
+  opacity: 0.55;
+}
+
+.treeGuides {
+  display: inline-flex;
+  align-items: stretch;
+  flex-shrink: 0;
+}
+
+.guideCell {
+  width: 22px;
+  position: relative;
+  /* height matches treeRow height so pseudo-elements span it */
+  align-self: stretch;
+}
+
+/* Vertical continuation: full-height pipe */
+.guideV::before {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--mantine-color-gray-3);
+}
+
+/* T-branch (├): vertical full-height + horizontal arm at midpoint */
+.guideT::before {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--mantine-color-gray-3);
+}
+.guideT::after {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  right: 0;
+  height: 2px;
+  background: var(--mantine-color-gray-3);
+  transform: translateY(-50%);
+}
+
+/* L-branch (└): vertical top-to-midpoint + horizontal arm */
+.guideL::before {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 0;
+  height: calc(50% + 1px);
+  width: 2px;
+  background: var(--mantine-color-gray-3);
+}
+.guideL::after {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: calc(50% - 1px);
+  right: 0;
+  height: 2px;
+  background: var(--mantine-color-gray-3);
+}
+
+.ghostThumb {
+  width: 36px;
+  height: 36px;
+  border-radius: calc(var(--fb-radius) - 2px);
+  border: 1.5px dashed var(--mantine-color-gray-4);
+  flex-shrink: 0;
+}
+
+/* ── Comments ────────────────────────────────────────────── */
+.comment {
+  display: flex;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--mantine-color-default-border);
+}
+
+.commentBody {
+  flex: 1;
+}
+
+.commentActions {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+/* ── Claim page ──────────────────────────────────────────── */
+.claimPage {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+}
+
+.claimInner {
+  width: 440px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.claimIconTile {
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--fb-radius);
+  background: var(--mantine-color-ocean-0);
+  color: var(--mantine-color-ocean-7);
+  align-items: center;
+  justify-content: center;
+}
+
+.codeInput input {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 18px;
+  text-align: center;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  height: 48px;
+}

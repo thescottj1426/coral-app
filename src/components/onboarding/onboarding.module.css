@@ -1,0 +1,122 @@
+.page {
+  min-height: 100vh;
+  background: var(--fb-app-bg, var(--mantine-color-gray-0));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 36px 48px 60px;
+  gap: 28px;
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 24px 16px 48px;
+    gap: 20px;
+  }
+}
+
+/* ---------- Path choice ---------- */
+.pathGrid {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+  max-width: 720px;
+}
+
+@media (max-width: 640px) {
+  .pathGrid {
+    flex-direction: column;
+  }
+}
+
+.pathCard {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  cursor: pointer;
+  transition: border-color 80ms ease, box-shadow 80ms ease;
+}
+
+.pathCardSelected {
+  border-color: var(--mantine-color-ocean-6) !important;
+  box-shadow: 0 0 0 1px var(--mantine-color-ocean-6);
+}
+
+.pathCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.pathIconTile {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--fb-radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 80ms ease, color 80ms ease;
+}
+
+.pathIconSelected {
+  background: var(--mantine-color-ocean-0);
+  color: var(--mantine-color-ocean-6);
+}
+
+.pathIconDefault {
+  background: var(--mantine-color-gray-1);
+  color: var(--mantine-color-gray-6);
+}
+
+.bulletList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.bullet {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+/* ---------- Tank / Seller forms ---------- */
+.formWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tankFormWrap {
+  width: 460px;
+  max-width: 100%;
+}
+
+.sellerFormWrap {
+  width: 480px;
+  max-width: 100%;
+}
+
+.volumeTypeRow {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 12px;
+}
+
+.dropzone {
+  height: 110px;
+}
+
+.tankActions {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.sellerFootnote {
+  text-align: center;
+}

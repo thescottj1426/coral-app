@@ -1,0 +1,99 @@
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 100%;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--mantine-color-default-border);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 700;
+  font-size: 15px;
+  font-family: var(--font-sora), sans-serif;
+  color: var(--mantine-color-ocean-6);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.logoMark {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: var(--mantine-color-ocean-6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.searchButton {
+  flex: 1;
+  max-width: 420px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: var(--fb-radius);
+  border: 1px solid var(--mantine-color-default-border);
+  background: var(--mantine-color-default);
+  cursor: text;
+  color: var(--mantine-color-dimmed);
+  font-size: 13px;
+}
+
+.searchButton:hover {
+  border-color: var(--mantine-color-gray-4);
+}
+
+.searchInput {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  color: var(--mantine-color-text);
+  font-size: 13px;
+  font-family: inherit;
+  min-width: 0;
+}
+
+.searchInput::placeholder {
+  color: var(--mantine-color-dimmed);
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ---------- Navbar ---------- */
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 8px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.navSection {
+  margin-top: 12px;
+  margin-bottom: 2px;
+  padding: 0 8px;
+}
+
+.eyebrow {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--mantine-color-dimmed);
+  font-weight: 500;
+}
