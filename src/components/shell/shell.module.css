@@ -73,6 +73,38 @@
   flex-shrink: 0;
 }
 
+.headerCollectionBtn {
+  display: flex;
+}
+
+.headerBell {
+  display: flex;
+}
+
+@media (max-width: 768px) {
+  .searchButton {
+    display: none;
+  }
+
+  .headerCollectionBtn {
+    display: none;
+  }
+
+  .headerBell {
+    display: none;
+  }
+}
+
+.mobileOnly {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobileOnly {
+    display: block;
+  }
+}
+
 /* ---------- Navbar ---------- */
 .nav {
   display: flex;

@@ -8,7 +8,7 @@ import styles from './discussion.module.css';
 
 interface Props {
   thread: ThreadRowType;
-  specimenSlug: string;
+  specimenSlug?: string;
 }
 
 export function ThreadRow({ thread, specimenSlug }: Props) {
@@ -25,7 +25,7 @@ export function ThreadRow({ thread, specimenSlug }: Props) {
 
   return (
     <Link
-      href={`/collection/${specimenSlug}/discussion/${thread.id}`}
+      href={`/discuss/${thread.id}`}
       className={styles.thread}
     >
       <div className={styles.threadInner}>

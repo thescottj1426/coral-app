@@ -161,6 +161,7 @@ export async function createReply(data: {
   );
 
   revalidatePath(`/collection/${data.specimenId}/discussion/${data.threadId}`);
+  revalidatePath(`/discuss/${data.threadId}`);
 }
 
 export async function markBestAnswer(data: {
@@ -182,4 +183,5 @@ export async function markBestAnswer(data: {
     [data.threadId]
   );
   revalidatePath(`/collection/${data.specimenId}/discussion/${data.threadId}`);
+  revalidatePath(`/discuss/${data.threadId}`);
 }

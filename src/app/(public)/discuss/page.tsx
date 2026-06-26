@@ -8,7 +8,7 @@ import { DiscussHub } from '@/components/discussion/DiscussHub';
 export const dynamic = 'force-dynamic';
 
 export default async function DiscussPage() {
-  const session = await auth.api.getSession({ headers: await headers() });
+  const session = await auth.api.getSession({ headers: await headers() }).catch(() => null);
 
   const [threads, mySpecimens] = await Promise.all([
     getAllThreads(),

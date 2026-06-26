@@ -1,7 +1,7 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
-import { NavLink, Text } from '@mantine/core';
+import { usePathname, useRouter } from 'next/navigation';
+import { NavLink, Text, Divider } from '@mantine/core';
 import {
   IconSeeding,
   IconCompass,
@@ -10,8 +10,9 @@ import {
   IconMessageCircle,
   IconLayoutDashboard,
   IconShieldCheck,
+  IconLogout,
 } from '@tabler/icons-react';
-import { useSession } from '@/lib/auth-client';
+import { useSession, signOut } from '@/lib/auth-client';
 import { useEffect, useState } from 'react';
 import styles from './shell.module.css';
 
@@ -27,6 +28,7 @@ const TOP_NAV = [
 
 export function AppNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const { data: session } = useSession();
   const [username, setUsername] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -110,6 +112,19 @@ export function AppNav() {
           />
         );
       })}
+
+      <div style={{ flex: 1 }} />
+      {session?.user && (
+        <div className={styles.mobileOnly}>
+          <Divider mx={8} mb={4} />
+          <NavLink
+            label="Sign out"
+            leftSection={<IconLogout size={16} stroke={1.7} color="var(--mantine-color-red-6)" />}
+            onClick={() => signOut({ fetchOptions: { onSuccess: () => router.push('/sign-in') } })}
+            styles={{ root: { borderRadius: 'var(--fb-radius)', color: 'var(--mantine-color-red-6)' } }}
+          />
+        </div>
+      )}
     </nav>
   );
 }

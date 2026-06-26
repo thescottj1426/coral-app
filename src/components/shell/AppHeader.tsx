@@ -81,18 +81,22 @@ export function AppHeader({ mobileNavOpen, onBurger }: AppHeaderProps) {
       </form>
 
       <div className={styles.headerRight}>
-        <Button
-          variant="light"
-          size="xs"
-          component={Link}
-          href="/collection"
-        >
-          My Collection
-        </Button>
+        <div className={styles.headerCollectionBtn}>
+          <Button
+            variant="light"
+            size="xs"
+            component={Link}
+            href="/collection"
+          >
+            My Collection
+          </Button>
+        </div>
 
-        <ActionIcon variant="default" size="md" aria-label="Notifications">
-          <IconBell size={16} stroke={1.7} />
-        </ActionIcon>
+        <div className={styles.headerBell}>
+          <ActionIcon variant="default" size="md" aria-label="Notifications">
+            <IconBell size={16} stroke={1.7} />
+          </ActionIcon>
+        </div>
 
         <Menu shadow="md" width={180} position="bottom-end">
           <Menu.Target>
