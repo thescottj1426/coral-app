@@ -54,12 +54,12 @@ export function SignUpForm() {
         email: values.email,
         password: values.password,
         name: values.username,
-        callbackURL: '/collection',
+        callbackURL: '/onboarding',
       });
       if (result.error) {
         setError(result.error.message ?? 'Something went wrong');
       } else {
-        router.push('/collection');
+        router.push('/verify-notice');
         router.refresh();
       }
     } finally {
@@ -111,7 +111,7 @@ export function SignUpForm() {
         <Button
           variant="default"
           fullWidth
-          onClick={() => authClient.signIn.social({ provider: 'google', callbackURL: '/collection' })}
+          onClick={() => authClient.signIn.social({ provider: 'google', callbackURL: '/onboarding' })}
         >
           Continue with Google
         </Button>

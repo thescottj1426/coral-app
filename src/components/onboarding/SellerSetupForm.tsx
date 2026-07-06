@@ -1,5 +1,6 @@
 'use client';
 
+import { useTransition } from 'react';
 import {
   TextInput,
   Textarea,
@@ -13,6 +14,7 @@ import { useForm, schemaResolver } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { useRouter } from 'next/navigation';
 import { z } from 'zod';
+import { updateProfile } from '@/app/actions/users';
 import styles from './onboarding.module.css';
 
 const SPECIALTIES = ['SPS', 'LPS', 'Softie', 'Zoa', 'Anemone'] as const;
@@ -35,6 +37,7 @@ type FormValues = z.infer<typeof schema>;
 
 export function SellerSetupForm() {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
   const form = useForm<FormValues>({
     validate: schemaResolver(schema),
@@ -48,14 +51,21 @@ export function SellerSetupForm() {
   });
 
   function handleSubmit(values: FormValues) {
-    // Seller profile creation via Prisma/Neon goes here
-    console.log('create seller', values);
-    notifications.show({
-      title: 'Shop opened!',
-      message: `"${values.shopName}" is live in the Farmers directory.`,
-      color: 'teal',
+    startTransition(async () => {
+      try {
+        await updateProfile({
+          isSeller: true,
+          shopName: values.shopName,
+          shopBio: values.bio,
+          specialty: values.specialties,
+          location: values.location,
+        });
+        notifications.show({ title: 'Shop opened!', message: `"${values.shopName}" is live.`, color: 'teal' });
+        router.push('/dashboard');
+      } catch {
+        notifications.show({ message: 'Could not save shop profile', color: 'red' });
+      }
     });
-    router.push('/');
   }
 
   return (
@@ -121,7 +131,7 @@ export function SellerSetupForm() {
           />
         </div>
 
-        <Button type="submit" fullWidth mt={6}>
+        <Button type="submit" fullWidth mt={6} loading={isPending}>
           Open shop →
         </Button>
 

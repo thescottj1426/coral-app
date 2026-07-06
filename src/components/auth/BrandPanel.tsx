@@ -18,7 +18,7 @@ export function BrandPanel() {
         <span className={styles.logoMark}>
           <IconLayoutGrid size={13} stroke={2.2} color="#fff" />
         </span>
-        polyp
+        Coral Chest
       </div>
 
       <div className={styles.brandMiddle}>

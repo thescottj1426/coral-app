@@ -114,10 +114,35 @@ export function DiscussHub({ threads, mySpecimens, isLoggedIn }: Props) {
         </button>
       </Group>
 
-      <Box style={{ display: 'grid', gridTemplateColumns: '260px 1fr 260px', gap: 20, alignItems: 'start' }}>
+      {/* Mobile anchor filter strip */}
+      <div className={styles.anchorScroll}>
+        {(['all', ...ANCHOR_ORDER] as const).map(type => {
+          const active = anchorFilter === type;
+          const cfg = type === 'all' ? null : ANCHOR_TYPE_CONFIG[type];
+          return (
+            <button
+              key={type}
+              type="button"
+              onClick={() => setAnchorFilter(type === 'all' ? 'all' : (anchorFilter === type ? 'all' : type))}
+              style={{
+                flexShrink: 0, height: 30, padding: '0 12px',
+                borderRadius: 999,
+                border: `1px solid ${active ? 'var(--mantine-primary-color-filled)' : 'var(--mantine-color-default-border)'}`,
+                background: active ? 'var(--mantine-primary-color-filled)' : 'var(--mantine-color-body)',
+                color: active ? '#fff' : 'var(--mantine-color-text)',
+                fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              {type === 'all' ? 'All' : cfg!.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <Box className={styles.hubGrid}>
 
         {/* ── Left sidebar: anchor type rows ── */}
-        <Stack gap={6}>
+        <Stack gap={6} className={styles.hubLeft}>
           <Text style={{ ...EYEBROW, display: 'block', marginBottom: 4 }}>Anchor type</Text>
 
           <AnchorTypeRow
@@ -151,7 +176,7 @@ export function DiscussHub({ threads, mySpecimens, isLoggedIn }: Props) {
 
         {/* ── Main column: thread list ── */}
         <Stack gap="md">
-          <Group justify="space-between" align="center">
+          <div className={styles.sortRow}>
             <Text style={EYEBROW}>
               {filtered.length} {filtered.length === 1 ? 'thread' : 'threads'}
               {anchorFilter !== 'all' && ` · ${ANCHOR_TYPE_CONFIG[anchorFilter].label}`}
@@ -161,12 +186,12 @@ export function DiscussHub({ threads, mySpecimens, isLoggedIn }: Props) {
               data={[
                 { value: 'active',     label: 'Active' },
                 { value: 'newest',     label: 'Newest' },
-                { value: 'unanswered', label: 'Unanswered' },
+                { value: 'unanswered', label: 'No replies' },
               ]}
               value={sort}
               onChange={v => setSort(v as SortOrder)}
             />
-          </Group>
+          </div>
 
           <Paper withBorder>
             {filtered.length === 0 ? (
@@ -196,7 +221,7 @@ export function DiscussHub({ threads, mySpecimens, isLoggedIn }: Props) {
         </Stack>
 
         {/* ── Right rail ── */}
-        <Stack gap="md">
+        <Stack gap="md" className={styles.hubRight}>
           {trending.length > 0 && (
             <Paper withBorder p="md">
               <Group gap={6} mb={10}>
@@ -257,7 +282,7 @@ export function DiscussHub({ threads, mySpecimens, isLoggedIn }: Props) {
           <Paper withBorder p="md" style={{ background: 'var(--mantine-color-ocean-0)', borderColor: 'var(--mantine-color-ocean-2)' }}>
             <Text size="sm" fw={700} c="ocean.9" mb={6}>Anchored = answerable</Text>
             <Text size="xs" c="dimmed" style={{ lineHeight: 1.6 }}>
-              Every thread lives on a specific coral, bloodline, or species — so the right people see it and the answer stays with the object forever.
+              Every thread lives on a specific coral, lineage, or species — so the right people see it and the answer stays with the object forever.
             </Text>
             <Link href="/collection" style={{ textDecoration: 'none', display: 'block', marginTop: 10 }}>
               <Box style={{

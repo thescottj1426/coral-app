@@ -37,7 +37,7 @@ export function FirstCoralForm() {
     setError('');
     try {
       await createSpecimen({ name: name.trim(), category, species: species.trim() || undefined, origin: origin.trim() || undefined });
-      router.push('/collection');
+      router.push('/dashboard');
     } catch {
       setError('Something went wrong. Try again.');
       setLoading(false);

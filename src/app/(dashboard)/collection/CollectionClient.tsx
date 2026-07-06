@@ -3,7 +3,6 @@
 import {
   Box,
   Group,
-  Stack,
   Text,
   Button,
   SimpleGrid,
@@ -12,7 +11,7 @@ import {
   Tabs,
   TextInput,
 } from '@mantine/core';
-import { IconPlus, IconSearch, IconLeaf } from '@tabler/icons-react';
+import { IconPlus, IconSearch } from '@tabler/icons-react';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -21,67 +20,47 @@ import { SpecimenThumb } from '@/components/specimen/SpecimenThumb';
 import { AddSpecimenDrawer } from '@/components/specimen/AddSpecimenDrawer';
 import { createSpecimen, type SpecimenRow } from '@/app/actions/specimens';
 import Image from 'next/image';
-
-const EYEBROW: React.CSSProperties = {
-  fontFamily: 'var(--font-ibm-plex-mono), monospace',
-  fontSize: 10,
-  textTransform: 'uppercase',
-  letterSpacing: '0.1em',
-  color: 'var(--mantine-color-dimmed)',
-  fontWeight: 500,
-};
+import styles from './collection.module.css';
 
 function SpecimenCard({ specimen }: { specimen: SpecimenRow }) {
   const thumb = specimen.rfCode ?? specimen.id;
   return (
-    <Paper
-      component={Link}
+    <Link
       href={`/collection/${specimen.rfCode ?? specimen.id}`}
-      withBorder
-      style={{ textDecoration: 'none', cursor: 'pointer', display: 'block' }}
+      className={styles.card}
     >
-      {specimen.coverPhotoUrl ? (
-        <div style={{ width: '100%', height: 80, borderRadius: '8px 8px 0 0', overflow: 'hidden', position: 'relative' }}>
-          <Image
-            src={specimen.coverPhotoUrl}
-            alt={specimen.name}
-            fill
-            style={{ objectFit: 'cover' }}
-            sizes="(max-width: 640px) 50vw, 25vw"
-          />
+      <Paper withBorder style={{ overflow: 'hidden' }}>
+        <div style={{ width: '100%', height: 240, position: 'relative', overflow: 'hidden' }}>
+          {specimen.coverPhotoUrl ? (
+            <Image
+              src={specimen.coverPhotoUrl}
+              alt={specimen.name}
+              fill
+              style={{ objectFit: 'cover', transition: 'transform 250ms ease' }}
+              className={styles.thumb}
+              sizes="(max-width: 640px) 50vw, 25vw"
+            />
+          ) : (
+            <div className={styles.thumb} style={{ width: '100%', height: '100%' }}>
+              <SpecimenThumb rfCode={thumb} size={0} style={{ width: '100%', height: '100%', borderRadius: 0 }} />
+            </div>
+          )}
+          <div className={styles.overlay}>
+            <Text size="md" fw={700} truncate style={{ color: '#fff', lineHeight: 1.3 }}>
+              {specimen.name}
+            </Text>
+            <Group gap={4} mt={3} wrap="nowrap">
+              {specimen.category && <CategoryBadge category={specimen.category} />}
+              {specimen.rfCode && (
+                <Text style={{ fontFamily: 'var(--font-ibm-plex-mono), monospace', fontSize: 9, color: 'rgba(255,255,255,0.6)', flexShrink: 0 }}>
+                  {specimen.rfCode}
+                </Text>
+              )}
+            </Group>
+          </div>
         </div>
-      ) : (
-        <SpecimenThumb
-          rfCode={thumb}
-          size={0}
-          style={{ width: '100%', height: 80, borderRadius: '8px 8px 0 0' }}
-        />
-      )}
-
-      <Stack gap={6} p="sm">
-        <Group gap={6} wrap="nowrap" justify="space-between">
-          <Text size="sm" fw={700} truncate style={{ flex: 1 }}>
-            {specimen.name}
-          </Text>
-          {specimen.category && <CategoryBadge category={specimen.category} />}
-        </Group>
-
-        {specimen.species && (
-          <Text size="xs" c="dimmed" truncate style={{ fontStyle: 'italic' }}>
-            {specimen.species}
-          </Text>
-        )}
-
-        <Group gap={0} justify="space-between">
-          <Text style={{ ...EYEBROW, fontSize: 9 }}>{specimen.rfCode ?? '—'}</Text>
-          <Text style={EYEBROW}>
-            {specimen.acquiredDate
-              ? new Date(specimen.acquiredDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-              : new Date(specimen.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-          </Text>
-        </Group>
-      </Stack>
-    </Paper>
+      </Paper>
+    </Link>
   );
 }
 
@@ -128,7 +107,7 @@ export function CollectionClient({ specimens }: CollectionClientProps) {
     return filtered.filter((s) => s.category === cat.category);
   }
 
-  const GRID = { base: 2, sm: 3, md: 4, lg: 5 } as const;
+  const GRID = { base: 2, sm: 3, md: 4 } as const;
 
   return (
     <Box p="lg" maw={1200}>

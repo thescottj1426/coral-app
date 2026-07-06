@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { notifications } from '@mantine/notifications';
 import {
   Group,
@@ -19,13 +20,17 @@ import {
   IconTrash,
   IconShield,
   IconScissors,
+  IconTag,
 } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useDisclosure } from '@mantine/hooks';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { FragModal } from '@/components/specimen/FragModal';
 import { EditSpecimenModal } from '@/components/specimen/EditSpecimenModal';
+import { ListFragModal } from '@/components/specimen/ListFragModal';
 import { SpecimenThumb } from '@/components/specimen/SpecimenThumb';
+import { PhotoLightbox } from '@/components/specimen/PhotoLightbox';
 import { deleteSpecimen } from '@/app/actions/specimens';
 import type { SpecimenDetail } from '@/app/actions/specimens';
 
@@ -50,6 +55,7 @@ export function SpecimenActions({ specimen }: Props) {
       <FragModal
         opened={fragOpened}
         onClose={closeFrag}
+        parentId={specimen.id}
         parentRfCode={specimen.rfCode ?? specimen.id}
         parentName={specimen.name}
         parentGeneration={myGeneration}
@@ -91,6 +97,7 @@ export function SpecimenActions({ specimen }: Props) {
 export function MetaStripActions({ specimen, isOwner }: Props) {
   const router = useRouter();
   const [fragOpened, { open: openFrag, close: closeFrag }] = useDisclosure(false);
+  const [listOpened, { open: openList, close: closeList }] = useDisclosure(false);
 
   async function handleDelete() {
     if (!confirm(`Delete "${specimen.name}"? This cannot be undone.`)) return;
@@ -105,9 +112,16 @@ export function MetaStripActions({ specimen, isOwner }: Props) {
       <FragModal
         opened={fragOpened}
         onClose={closeFrag}
+        parentId={specimen.id}
         parentRfCode={specimen.rfCode ?? specimen.id}
         parentName={specimen.name}
         parentGeneration={0}
+      />
+      <ListFragModal
+        opened={listOpened}
+        onClose={closeList}
+        coralId={specimen.id}
+        coralName={specimen.name}
       />
       <Group gap="xs" ml="auto">
         <Button
@@ -118,6 +132,14 @@ export function MetaStripActions({ specimen, isOwner }: Props) {
           onClick={openFrag}
         >
           Frag this specimen
+        </Button>
+        <Button
+          variant="light"
+          size="xs"
+          leftSection={<IconTag size={12} />}
+          onClick={openList}
+        >
+          List frags
         </Button>
         <Button
           component={Link}
@@ -211,5 +233,42 @@ export function LineageSidebar({ specimen }: Props) {
         View full collection →
       </Anchor>
     </Paper>
+  );
+}
+
+interface HeroPhotoProps {
+  photo: { id: string; url: string; status: string };
+  specimenName: string;
+  isOwner: boolean;
+}
+
+export function HeroPhoto({ photo, specimenName, isOwner }: HeroPhotoProps) {
+  const [open, setOpen] = useState(false);
+  const isPending = isOwner && photo.status === 'pending';
+
+  return (
+    <>
+      <div
+        onClick={() => setOpen(true)}
+        style={{ position: 'absolute', inset: 0, cursor: 'zoom-in' }}
+      >
+        <Image src={photo.url} alt={specimenName} fill style={{ objectFit: 'cover' }} priority />
+        {isPending && (
+          <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 2 }}>
+            <Badge color="yellow" variant="filled" size="sm" radius="sm">Pending Review</Badge>
+          </div>
+        )}
+      </div>
+      <PhotoLightbox
+        photos={[photo]}
+        initialIndex={0}
+        currentIndex={0}
+        onNavigate={() => {}}
+        opened={open}
+        onClose={() => setOpen(false)}
+        specimenName={specimenName}
+        isOwner={isOwner}
+      />
+    </>
   );
 }

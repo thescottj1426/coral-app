@@ -1,0 +1,22 @@
+.mainGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--mantine-spacing-md);
+  align-items: start;
+}
+
+@media (min-width: 768px) {
+  .mainGrid {
+    grid-template-columns: 1.7fr 1fr;
+  }
+}
+
+.coralCard {
+  text-decoration: none;
+  display: block;
+  transition: box-shadow 150ms ease, transform 150ms ease;
+}
+.coralCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}

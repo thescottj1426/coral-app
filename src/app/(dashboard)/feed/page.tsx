@@ -8,21 +8,15 @@ import {
   Badge,
   Button,
   Avatar,
-  SegmentedControl,
 } from '@mantine/core';
 import {
   IconHeart,
   IconMessageCircle,
   IconShare3,
   IconDots,
-  IconPhoto,
-  IconTag,
-  IconScissors,
-  IconHelpCircle,
   IconArrowRight,
   IconSeeding,
-  IconTrendingUp,
-  IconCake,
+  IconCompass,
 } from '@tabler/icons-react';
 import { coralIdentityGradient } from '@/theme/theme';
 import { getFeedItems } from '@/app/actions/feed';
@@ -33,10 +27,6 @@ export const dynamic = 'force-dynamic';
 
 function identGrad(hue: number) {
   return `linear-gradient(135deg, oklch(0.72 0.13 ${hue}), oklch(0.5 0.15 ${hue}))`;
-}
-
-function fink(hue: number) {
-  return `oklch(0.55 0.16 ${hue})`;
 }
 
 function timeAgo(iso: string) {
@@ -51,38 +41,6 @@ function timeAgo(iso: string) {
 function initials(displayName: string | null, username: string) {
   const src = displayName ?? username;
   return src.split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('');
-}
-
-// ── Composer (client-only piece is just a placeholder input) ─────────────────
-function Composer() {
-  return (
-    <Paper withBorder p="md" className={css.composer}>
-      <div className={css.composerTop}>
-        <Avatar size={40} radius="xl" style={{ background: identGrad(25), color: '#fff', fontWeight: 700 }}>
-          M
-        </Avatar>
-        <div className={css.composerInput}>
-          Share an update, ask the community, or post a frag…
-        </div>
-      </div>
-      <div className={css.composerActions}>
-        <button className={css.composerChip} style={{ color: fink(200) }}>
-          <IconPhoto size={15} /> Photo
-        </button>
-        <button className={css.composerChip} style={{ color: fink(25) }}>
-          <IconTag size={15} /> Tag specimen
-        </button>
-        <button className={css.composerChip} style={{ color: fink(40) }}>
-          <IconScissors size={15} /> List a frag
-        </button>
-        <button className={css.composerChip} style={{ color: fink(140) }}>
-          <IconHelpCircle size={15} /> Ask a question
-        </button>
-        <Box style={{ flex: 1 }} />
-        <Button size="xs">Post</Button>
-      </div>
-    </Paper>
-  );
 }
 
 // ── Post card ────────────────────────────────────────────────────────────────
@@ -171,8 +129,8 @@ function PostCard({ item }: { item: FeedItem }) {
             </Stack>
           ) : (
             <Link href={`/collection/${item.specimenId}`}>
-            <Button component="a" size="xs" variant="default">View</Button>
-          </Link>
+              <Button component="a" size="xs" variant="default">View</Button>
+            </Link>
           )}
         </div>
       )}
@@ -217,76 +175,36 @@ function PostCard({ item }: { item: FeedItem }) {
 }
 
 // ── Right rail ───────────────────────────────────────────────────────────────
-const SUGGEST = [
-  { who: 'Tidal Gardens', hue: 160, meta: 'Reef & Coral · frags shared' },
-  { who: 'Pastel Pythons', hue: 140, meta: 'Reptiles · bloodlines' },
-];
-
-const TRENDING = [
-  { tag: 'Acropora tortuosa', meta: 'Reef & Coral', n: '18 threads', hue: 140 },
-  { tag: 'Bucephalandra', meta: 'Freshwater', n: '15 threads', hue: 150 },
-  { tag: 'SPS frag tips', meta: 'Reef & Coral', n: '11 threads', hue: 200 },
-];
-
 function RightRail() {
   return (
     <Stack gap="md">
       <Paper withBorder p="md">
-        <Group justify="space-between" align="center" mb={4}>
-          <span className={css.eyebrow}>who to follow</span>
-          <Text size="xs" fw={600} c="ocean.6" style={{ cursor: 'pointer' }}>See all</Text>
+        <Group gap={8} mb={10}>
+          <IconCompass size={16} color="var(--mantine-color-ocean-6)" />
+          <Text fw={600} size="sm">Discover keepers</Text>
         </Group>
-        {SUGGEST.map((s) => (
-          <Group key={s.who} gap={10} py={9} style={{ borderTop: '1px solid var(--mantine-color-default-border)' }} wrap="nowrap">
-            <Avatar size={36} radius="xl" style={{ background: identGrad(s.hue), color: '#fff', fontWeight: 700, flexShrink: 0 }}>
-              {s.who[0]}
-            </Avatar>
-            <Stack gap={0} style={{ flex: 1, minWidth: 0 }}>
-              <Text size="sm" fw={600} truncate>{s.who}</Text>
-              <Text size="xs" c="dimmed" truncate>{s.meta}</Text>
-            </Stack>
-            <Button size="xs" variant="light" style={{ flexShrink: 0 }}>Follow</Button>
-          </Group>
-        ))}
+        <Text size="xs" c="dimmed" mb={12} style={{ lineHeight: 1.6 }}>
+          Find other reef keepers, browse public collections, and follow the ones you like.
+        </Text>
+        <Link href="/explore">
+          <Button component="a" variant="light" size="xs" fullWidth>Explore keepers</Button>
+        </Link>
       </Paper>
 
       <Paper withBorder p="md">
-        <span className={css.eyebrow} style={{ marginBottom: 10 }}>trending in your communities</span>
-        <Stack gap={8} mt={10}>
-          {TRENDING.map((t) => (
-            <Group key={t.tag} gap={10} wrap="nowrap">
-              <Box
-                style={{
-                  width: 28, height: 28, borderRadius: 'var(--mantine-radius-md)', flexShrink: 0,
-                  background: `oklch(0.96 0.03 ${t.hue})`,
-                  color: fink(t.hue),
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}
-              >
-                <IconTrendingUp size={14} />
-              </Box>
-              <Stack gap={0} style={{ flex: 1, minWidth: 0 }}>
-                <Text size="xs" fw={600} truncate>{t.tag}</Text>
-                <Text size="xs" c="dimmed">{t.meta}</Text>
-              </Stack>
-              <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>{t.n}</Text>
-            </Group>
-          ))}
-        </Stack>
-      </Paper>
-
-      <Paper withBorder p="md" style={{ background: 'var(--mantine-color-ocean-0)', borderColor: 'var(--mantine-color-ocean-1)' }}>
-        <Group gap={8} mb={6}>
-          <IconCake size={16} color="var(--mantine-color-ocean-7)" />
-          <Text fw={600} size="sm" c="ocean.9">Coming up</Text>
+        <Group gap={8} mb={10}>
+          <IconMessageCircle size={16} color="var(--mantine-color-ocean-6)" />
+          <Text fw={600} size="sm">Community discussions</Text>
         </Group>
-        <Text size="xs" c="ocean.7">
-          Share your first coral anniversary post when your collection turns a year old.
+        <Text size="xs" c="dimmed" mb={12} style={{ lineHeight: 1.6 }}>
+          Ask questions, share tips, and talk frags with other hobbyists.
         </Text>
+        <Link href="/discuss">
+          <Button component="a" variant="light" size="xs" fullWidth>Go to Discuss</Button>
+        </Link>
       </Paper>
 
       <Text size="xs" c="dimmed" px={4} style={{ lineHeight: 1.7 }}>
-        About · Communities · Guidelines · Help<br />
         Polyp © 2026
       </Text>
     </Stack>
@@ -306,31 +224,12 @@ export default async function FeedPage() {
         <Text style={{ fontFamily: 'var(--font-sora)', fontWeight: 700, fontSize: 24, lineHeight: 1.2 }}>
           Feed
         </Text>
-        <Text size="sm" c="dimmed">From keepers and communities you follow</Text>
+        <Text size="sm" c="dimmed">From keepers you follow</Text>
       </Stack>
 
       <Group align="flex-start" gap="lg" wrap="nowrap">
         {/* Main column */}
         <Stack gap="md" style={{ flex: 1, minWidth: 0 }}>
-          <Composer />
-
-          {/* Scope bar */}
-          <div className={css.scopeBar}>
-            <SegmentedControl
-              size="xs"
-              data={['Following', 'Your communities', 'For you']}
-              defaultValue="Following"
-            />
-            <Box style={{ flex: 1 }} />
-            <div className={css.commFilter}>
-              <span className={`${css.commPill} ${css.commPillActive}`}>All</span>
-              <span className={css.commPill}>
-                <span className={css.commDot} style={{ background: identGrad(200) }} />
-                Reef
-              </span>
-            </div>
-          </div>
-
           {items.length === 0 && (
             <Paper withBorder p="xl">
               <Stack align="center" gap="sm">

@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { Sora, IBM_Plex_Mono } from 'next/font/google';
-import Script from 'next/script';
 import { Providers } from './providers';
 import './globals.css';
 
@@ -34,9 +33,8 @@ export default function RootLayout({
       className={`${sora.variable} ${ibmPlexMono.variable}`}
       suppressHydrationWarning
     >
-      <body>
+      <body suppressHydrationWarning>
         <Providers>{children}</Providers>
-        <Script id="mantine-color-scheme" strategy="beforeInteractive" src="/mantine-color-scheme.js" />
       </body>
     </html>
   );

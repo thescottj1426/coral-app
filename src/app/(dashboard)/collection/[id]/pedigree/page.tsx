@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { Box, Group, Text, Stack, Paper, Anchor, Breadcrumbs, Badge } from '@mantine/core';
+import { Box, Group, Text, Stack, Paper, Breadcrumbs, Badge } from '@mantine/core';
 import Link from 'next/link';
 import { getSpecimen } from '@/app/actions/specimens';
 import { getLineage, getChildren } from '@/app/actions/lineage';
@@ -32,10 +32,10 @@ export default async function PedigreePage({ params }: Props) {
   return (
     <Box p="lg" maw={900}>
       <Breadcrumbs mb="md" style={{ fontSize: 13 }}>
-        <Anchor component={Link} href="/collection">Collection</Anchor>
-        <Anchor component={Link} href={`/collection/${specimen.rfCode ?? specimen.id}`}>
+        <Link href="/collection" style={{ color: 'inherit', textDecoration: 'none' }}>Collection</Link>
+        <Link href={`/collection/${specimen.rfCode ?? specimen.id}`} style={{ color: 'inherit', textDecoration: 'none' }}>
           {specimen.name}
-        </Anchor>
+        </Link>
         <Text size="sm" c="dimmed">Pedigree</Text>
       </Breadcrumbs>
 
@@ -89,14 +89,9 @@ export default async function PedigreePage({ params }: Props) {
                   }}
                 />
                 <Stack gap={2} style={{ flex: 1 }}>
-                  <Anchor
-                    component={Link}
-                    href={`/collection/${node.rfCode ?? node.id}`}
-                    size="sm"
-                    fw={600}
-                  >
+                  <Link href={`/collection/${node.rfCode ?? node.id}`} style={{ fontSize: 14, fontWeight: 600, color: 'var(--mantine-primary-color-filled)', textDecoration: 'none' }}>
                     {node.name}
-                  </Anchor>
+                  </Link>
                   <Group gap={6}>
                     {node.rfCode && (
                       <Text style={{ fontFamily: 'var(--font-ibm-plex-mono), monospace', fontSize: 11 }} c="dimmed">
@@ -158,14 +153,9 @@ export default async function PedigreePage({ params }: Props) {
                       }}
                     />
                     <Stack gap={2} style={{ flex: 1 }}>
-                      <Anchor
-                        component={Link}
-                        href={`/collection/${child.rfCode ?? child.id}`}
-                        size="sm"
-                        fw={600}
-                      >
+                      <Link href={`/collection/${child.rfCode ?? child.id}`} style={{ fontSize: 14, fontWeight: 600, color: 'var(--mantine-primary-color-filled)', textDecoration: 'none' }}>
                         {child.name}
-                      </Anchor>
+                      </Link>
                       <Group gap={6}>
                         {child.rfCode && (
                           <Text style={{ fontFamily: 'var(--font-ibm-plex-mono), monospace', fontSize: 11 }} c="dimmed">

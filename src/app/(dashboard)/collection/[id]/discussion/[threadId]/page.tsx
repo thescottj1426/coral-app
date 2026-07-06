@@ -9,6 +9,7 @@ import { getSpecimen } from '@/app/actions/specimens';
 import { auth } from '@/lib/auth';
 import { coralIdentityGradient } from '@/theme/theme';
 import { TypeBadge, ResolvedBadge } from '@/components/discussion/TypeBadge';
+import styles from '@/components/discussion/discussion.module.css';
 import { AnchorCard } from '@/components/discussion/AnchorCard';
 import { ReplyItem } from '@/components/discussion/ReplyItem';
 import { ReplyComposer } from '@/components/discussion/ReplyComposer';
@@ -75,7 +76,7 @@ export default async function ThreadDetailPage({ params }: Props) {
         <span style={{ color: 'var(--mantine-color-text)', fontWeight: 500 }}>Thread</span>
       </Group>
 
-      <Box style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 18, alignItems: 'start' }}>
+      <Box className={styles.threadGrid}>
 
         {/* ── Main column ── */}
         <Stack gap="md">
@@ -191,7 +192,7 @@ export default async function ThreadDetailPage({ params }: Props) {
         </Stack>
 
         {/* ── Right rail ── */}
-        <Stack gap="md">
+        <Stack gap="md" className={styles.threadRail}>
 
           {/* Watching */}
           <Paper withBorder p="md">

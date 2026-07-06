@@ -13,10 +13,12 @@ import {
   ThemeIcon,
   Badge,
   ScrollArea,
+  Loader,
 } from '@mantine/core';
 import { IconCopy, IconCheck, IconLeaf, IconScissors, IconPlus } from '@tabler/icons-react';
-import { useState, useCallback } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { CoralThumb } from './CoralThumb';
+import { createFrags } from '@/app/actions/lineage';
 
 const EYEBROW: React.CSSProperties = {
   fontFamily: 'var(--font-ibm-plex-mono), monospace',
@@ -27,33 +29,40 @@ const EYEBROW: React.CSSProperties = {
   fontWeight: 500,
 };
 
-function generateRFCode(): string {
-  // Avoids ambiguous chars (0/O, 1/I/L)
-  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-  return 'RF-' + Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-}
-
 export interface FragModalProps {
   opened: boolean;
   onClose: () => void;
+  parentId: string;
   parentRfCode: string;
   parentName: string;
   parentGeneration: number;
 }
 
-export function FragModal({ opened, onClose, parentRfCode, parentName, parentGeneration }: FragModalProps) {
+export function FragModal({ opened, onClose, parentId, parentRfCode, parentName, parentGeneration }: FragModalProps) {
   const newGeneration = parentGeneration + 1;
+  const [codes, setCodes] = useState<string[]>([]);
+  const [isPending, startTransition] = useTransition();
 
-  // Start with one code; each "Log another" appends
-  const [codes, setCodes] = useState<string[]>(() => [generateRFCode()]);
+  useEffect(() => {
+    if (!opened) {
+      setCodes([]);
+      return;
+    }
+    startTransition(async () => {
+      const newCodes = await createFrags(parentId, 1);
+      setCodes(newCodes);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opened]);
 
-  const addFrag = useCallback(() => {
-    setCodes((prev) => [...prev, generateRFCode()]);
-  }, []);
+  function addFrag() {
+    startTransition(async () => {
+      const newCodes = await createFrags(parentId, 1);
+      setCodes((prev) => [...prev, ...newCodes]);
+    });
+  }
 
   function handleClose() {
-    // Reset to a fresh single code on next open
-    setCodes([generateRFCode()]);
     onClose();
   }
 
@@ -106,65 +115,72 @@ export function FragModal({ opened, onClose, parentRfCode, parentName, parentGen
         {/* Code list */}
         <Stack gap={4}>
           <Group justify="space-between" align="center" mb={4}>
-            <Text style={EYEBROW}>rf codes generated</Text>
+            <Text style={EYEBROW}>rf codes registered</Text>
             <Text size="xs" c="dimmed">{codes.length} frag{codes.length !== 1 ? 's' : ''} logged</Text>
           </Group>
 
-          <ScrollArea.Autosize mah={280} offsetScrollbars>
-            <Stack gap={6}>
-              {codes.map((code, i) => (
-                <Paper
-                  key={code}
-                  p="sm"
-                  style={{
-                    background: 'var(--mantine-color-ocean-0)',
-                    border: '1px solid var(--mantine-color-ocean-2)',
-                  }}
-                >
-                  <Group gap={10} wrap="nowrap" align="center">
-                    <Text
-                      style={{
-                        fontFamily: 'var(--font-ibm-plex-mono), monospace',
-                        fontSize: 10,
-                        color: 'var(--mantine-color-dimmed)',
-                        width: 20,
-                        flexShrink: 0,
-                        textAlign: 'right',
-                      }}
-                    >
-                      {i + 1}
-                    </Text>
-                    <Text
-                      style={{
-                        fontFamily: 'var(--font-ibm-plex-mono), monospace',
-                        fontSize: 20,
-                        fontWeight: 700,
-                        letterSpacing: '0.1em',
-                        color: 'var(--mantine-color-ocean-9)',
-                        flex: 1,
-                      }}
-                    >
-                      {code}
-                    </Text>
-                    <CopyButton value={code} timeout={2000}>
-                      {({ copied, copy }) => (
-                        <ActionIcon
-                          variant="light"
-                          color={copied ? 'teal' : 'ocean'}
-                          size="md"
-                          radius="md"
-                          onClick={copy}
-                          aria-label={`Copy ${code}`}
-                        >
-                          {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
-                        </ActionIcon>
-                      )}
-                    </CopyButton>
-                  </Group>
-                </Paper>
-              ))}
-            </Stack>
-          </ScrollArea.Autosize>
+          {isPending && codes.length === 0 ? (
+            <Group justify="center" py="md">
+              <Loader size="sm" color="teal" />
+              <Text size="xs" c="dimmed">Registering frag code…</Text>
+            </Group>
+          ) : (
+            <ScrollArea.Autosize mah={280} offsetScrollbars>
+              <Stack gap={6}>
+                {codes.map((code, i) => (
+                  <Paper
+                    key={code}
+                    p="sm"
+                    style={{
+                      background: 'var(--mantine-color-ocean-0)',
+                      border: '1px solid var(--mantine-color-ocean-2)',
+                    }}
+                  >
+                    <Group gap={10} wrap="nowrap" align="center">
+                      <Text
+                        style={{
+                          fontFamily: 'var(--font-ibm-plex-mono), monospace',
+                          fontSize: 10,
+                          color: 'var(--mantine-color-dimmed)',
+                          width: 20,
+                          flexShrink: 0,
+                          textAlign: 'right',
+                        }}
+                      >
+                        {i + 1}
+                      </Text>
+                      <Text
+                        style={{
+                          fontFamily: 'var(--font-ibm-plex-mono), monospace',
+                          fontSize: 20,
+                          fontWeight: 700,
+                          letterSpacing: '0.1em',
+                          color: 'var(--mantine-color-ocean-9)',
+                          flex: 1,
+                        }}
+                      >
+                        {code}
+                      </Text>
+                      <CopyButton value={code} timeout={2000}>
+                        {({ copied, copy }) => (
+                          <ActionIcon
+                            variant="light"
+                            color={copied ? 'teal' : 'ocean'}
+                            size="md"
+                            radius="md"
+                            onClick={copy}
+                            aria-label={`Copy ${code}`}
+                          >
+                            {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
+                          </ActionIcon>
+                        )}
+                      </CopyButton>
+                    </Group>
+                  </Paper>
+                ))}
+              </Stack>
+            </ScrollArea.Autosize>
+          )}
         </Stack>
 
         {/* Add another */}
@@ -172,6 +188,7 @@ export function FragModal({ opened, onClose, parentRfCode, parentName, parentGen
           variant="light"
           leftSection={<IconPlus size={14} />}
           onClick={addFrag}
+          loading={isPending}
           fullWidth
         >
           Log another frag
@@ -207,9 +224,7 @@ export function FragModal({ opened, onClose, parentRfCode, parentName, parentGen
           </Stack>
         </Paper>
 
-        <Button onClick={handleClose}>
-          Done
-        </Button>
+        <Button onClick={handleClose}>Done</Button>
       </Stack>
     </Modal>
   );

@@ -1,6 +1,7 @@
 'use server';
 
 import { headers } from 'next/headers';
+import { revalidatePath } from 'next/cache';
 import { pool } from '@/lib/db';
 import { auth } from '@/lib/auth';
 import type { SpecimenRow } from './specimens';
@@ -37,8 +38,8 @@ export async function getUserProfile(username: string): Promise<UserProfile | nu
               COUNT(DISTINCT c.id)::int AS "specimenCount",
               COUNT(DISTINCT l."parentId")::int AS "bloodlineCount",
               0::int AS "sharedCount",
-              0::int AS "followerCount",
-              0::int AS "followingCount"
+              (SELECT COUNT(*)::int FROM public."Follow" f WHERE f."followingId" = u.id) AS "followerCount",
+              (SELECT COUNT(*)::int FROM public."Follow" f WHERE f."followerId" = u.id) AS "followingCount"
        FROM public."User" u
        LEFT JOIN public."Coral" c ON c."ownerId" = u.id
        LEFT JOIN public."Lineage" l ON l."parentId" = c.id
@@ -152,5 +153,82 @@ export async function getSessionUserId(): Promise<string | null> {
     return session?.user?.id ?? null;
   } catch {
     return null;
+  }
+}
+
+export type UpdateProfileData = {
+  displayName?: string;
+  bio?: string;
+  location?: string;
+  isSeller?: boolean;
+  shopName?: string;
+  shopBio?: string;
+  specialty?: string[];
+};
+
+export async function updateProfile(data: UpdateProfileData): Promise<void> {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user) throw new Error('Not authenticated');
+  const userId = session.user.id;
+
+  const setClauses: string[] = [];
+  const params: unknown[] = [userId];
+  let i = 2;
+
+  if ('displayName' in data) { setClauses.push(`"displayName" = $${i++}`); params.push(data.displayName ?? null); }
+  if ('bio' in data)         { setClauses.push(`bio = $${i++}`); params.push(data.bio ?? null); }
+  if ('location' in data)    { setClauses.push(`location = $${i++}`); params.push(data.location ?? null); }
+  if ('isSeller' in data)    { setClauses.push(`"isSeller" = $${i++}`); params.push(data.isSeller ?? false); }
+  if ('shopName' in data)    { setClauses.push(`"shopName" = $${i++}`); params.push(data.shopName ?? null); }
+  if ('shopBio' in data)     { setClauses.push(`"shopBio" = $${i++}`); params.push(data.shopBio ?? null); }
+  if ('specialty' in data) {
+    setClauses.push(`specialty = $${i++}`);
+    params.push(data.specialty?.length ? `{${data.specialty.join(',')}}` : null);
+  }
+
+  if (!setClauses.length) return;
+  await pool.query(`UPDATE public."User" SET ${setClauses.join(', ')} WHERE id = $1`, params);
+  revalidatePath(`/users/${session.user.name}`);
+}
+
+export async function followUser(targetUserId: string): Promise<void> {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user) throw new Error('Not authenticated');
+  await pool.query(
+    `CREATE TABLE IF NOT EXISTS public."Follow" (
+       id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+       "followerId" TEXT NOT NULL,
+       "followingId" TEXT NOT NULL,
+       "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+       UNIQUE("followerId", "followingId")
+     )`,
+    []
+  );
+  await pool.query(
+    `INSERT INTO public."Follow" ("followerId", "followingId") VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+    [session.user.id, targetUserId]
+  );
+  revalidatePath(`/users`);
+}
+
+export async function unfollowUser(targetUserId: string): Promise<void> {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user) throw new Error('Not authenticated');
+  await pool.query(
+    `DELETE FROM public."Follow" WHERE "followerId" = $1 AND "followingId" = $2`,
+    [session.user.id, targetUserId]
+  );
+  revalidatePath(`/users`);
+}
+
+export async function getIsFollowing(viewerId: string, targetUserId: string): Promise<boolean> {
+  try {
+    const { rows } = await pool.query(
+      `SELECT 1 FROM public."Follow" WHERE "followerId" = $1 AND "followingId" = $2 LIMIT 1`,
+      [viewerId, targetUserId]
+    );
+    return rows.length > 0;
+  } catch {
+    return false;
   }
 }

@@ -10,17 +10,14 @@ import {
   Badge,
   Button,
   SimpleGrid,
-  Anchor,
 } from '@mantine/core';
 import {
   IconMapPin,
   IconCalendar,
-  IconLink,
   IconCheck,
   IconEdit,
   IconMessage,
   IconCamera,
-  IconStar,
   IconTruck,
   IconLeaf,
   IconChevronRight,
@@ -30,7 +27,10 @@ import {
   getUserProfile,
   getUserSpecimens,
   getUserBloodlines,
+  getIsFollowing,
 } from '@/app/actions/users';
+import { EditProfileButton } from '@/components/profile/EditProfileModal';
+import { FollowButton } from '@/components/profile/FollowButton';
 import { coralIdentityGradient } from '@/theme/theme';
 import { CategoryBadge } from '@/components/coral/CategoryBadge';
 import { ProfileTabs } from './ProfileTabs';
@@ -71,8 +71,12 @@ export default async function UserProfilePage({
   const p = profile!;
 
   const own = session?.user?.id === p.id;
-  const specimens = await getUserSpecimens(p.id);
-  const bloodlines = await getUserBloodlines(p.id);
+  const viewerId = session?.user?.id ?? null;
+  const [specimens, bloodlines, isFollowing] = await Promise.all([
+    getUserSpecimens(p.id),
+    getUserBloodlines(p.id),
+    viewerId && !own ? getIsFollowing(viewerId, p.id) : Promise.resolve(false),
+  ]);
 
   const displayName = p.displayName ?? p.username;
   const avatarHue = 25;
@@ -84,7 +88,7 @@ export default async function UserProfilePage({
 
   const stats = [
     { v: p.specimenCount, k: 'Animals' },
-    { v: p.bloodlineCount, k: 'Bloodlines' },
+    { v: p.bloodlineCount, k: 'Lineages' },
     { v: p.followerCount, k: 'Followers' },
     { v: p.followingCount, k: 'Following' },
   ];
@@ -97,9 +101,9 @@ export default async function UserProfilePage({
         <Group justify="space-between" align="center" px="md" pt="md" pb={10}>
           <Eyebrow>featured collection</Eyebrow>
           {specimens.length > 6 && (
-            <Anchor component={Link} href={`/users/${username}/collection`} size="xs" fw={600}>
+            <Link href={`/users/${username}/collection`} style={{ fontSize: 12, fontWeight: 600, color: 'var(--mantine-primary-color-filled)', textDecoration: 'none' }}>
               View all {specimens.length} →
-            </Anchor>
+            </Link>
           )}
         </Group>
         <Box px="md" pb="md">
@@ -137,11 +141,11 @@ export default async function UserProfilePage({
     return (
       <Paper withBorder>
         <Group justify="space-between" align="center" px="md" pt="md" pb={10}>
-          <Eyebrow>bloodlines founded · {bloodlines.length}</Eyebrow>
+          <Eyebrow>lineages founded · {bloodlines.length}</Eyebrow>
         </Group>
         <Stack gap={0} px="md" pb="md">
           {bloodlines.length === 0 && (
-            <Text size="xs" c="dimmed">No bloodlines yet.</Text>
+            <Text size="xs" c="dimmed">No lineages yet.</Text>
           )}
           {bloodlines.map((b) => (
             <div key={b.rootId} className={css.bloodlineCard} style={{ marginBottom: 10 }}>
@@ -162,14 +166,9 @@ export default async function UserProfilePage({
                 <div className={css.bloodlineStatValue}>{b.keeperCount}</div>
                 <div className={css.bloodlineStatLabel}>Keepers</div>
               </div>
-              <Button
-                component={Link}
-                href={`/collection/${b.rootId}/pedigree`}
-                size="xs"
-                variant="default"
-              >
-                Tree
-              </Button>
+              <Link href={`/collection/${b.rootId}/pedigree`} style={{ textDecoration: 'none' }}>
+                <Button component="a" size="xs" variant="default">Tree</Button>
+              </Link>
             </div>
           ))}
         </Stack>
@@ -288,7 +287,7 @@ export default async function UserProfilePage({
   const bloodlinesPanel = (
     <Stack gap="sm">
       {bloodlines.length === 0 && (
-        <Text size="sm" c="dimmed">No bloodlines yet.</Text>
+        <Text size="sm" c="dimmed">No lineages yet.</Text>
       )}
       {bloodlines.map((b) => (
         <Paper key={b.rootId} withBorder p="md">
@@ -305,9 +304,9 @@ export default async function UserProfilePage({
                 <Text size="xs" c="dimmed">{b.keeperCount} keepers</Text>
               </Group>
             </Stack>
-            <Button component={Link} href={`/collection/${b.rootId}/pedigree`} size="xs" variant="default" rightSection={<IconChevronRight size={12} />}>
-              Tree
-            </Button>
+            <Link href={`/collection/${b.rootId}/pedigree`} style={{ textDecoration: 'none' }}>
+              <Button component="a" size="xs" variant="default" rightSection={<IconChevronRight size={12} />}>Tree</Button>
+            </Link>
           </Group>
         </Paper>
       ))}
@@ -361,15 +360,21 @@ export default async function UserProfilePage({
           </div>
           <div className={css.actions}>
             {own ? (
-              <Button variant="default" size="sm" leftSection={<IconEdit size={14} />}>
-                Edit profile
-              </Button>
+              <EditProfileButton initial={{
+                displayName: p.displayName,
+                bio: p.bio,
+                location: p.location,
+                isSeller: p.isSeller,
+                shopName: p.shopName,
+                shopBio: p.shopBio,
+                specialty: p.specialty,
+              }} />
             ) : (
               <>
                 <Button variant="default" size="sm" leftSection={<IconMessage size={14} />}>
                   Message
                 </Button>
-                <Button size="sm">Follow</Button>
+                <FollowButton targetUserId={p.id} initialFollowing={isFollowing} />
               </>
             )}
           </div>
@@ -391,7 +396,7 @@ export default async function UserProfilePage({
         tabs={[
           { value: 'overview', label: 'Overview', panel: overviewPanel },
           { value: 'collection', label: `Collection ${p.specimenCount}`, count: p.specimenCount, panel: collectionPanel },
-          { value: 'bloodlines', label: `Bloodlines ${bloodlines.length}`, count: bloodlines.length, panel: bloodlinesPanel },
+          { value: 'bloodlines', label: `Lineages ${bloodlines.length}`, count: bloodlines.length, panel: bloodlinesPanel },
         ]}
       />
     </Box>

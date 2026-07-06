@@ -14,7 +14,7 @@ import { anchorInk } from '@/lib/anchorTypes';
 import type { ThreadType } from '@/app/actions/discussions';
 
 const ALT_ANCHORS = [
-  { key: 'line',    label: 'Bloodline',      hue: 210, Icon: IconGitBranch  },
+  { key: 'line',    label: 'Lineage',        hue: 210, Icon: IconGitBranch  },
   { key: 'species', label: 'Species',        hue: 140, Icon: IconHexagon    },
   { key: 'photo',   label: 'Photo pin',      hue: 330, Icon: IconMapPin     },
   { key: 'listing', label: 'Listing',        hue: 40,  Icon: IconTag        },

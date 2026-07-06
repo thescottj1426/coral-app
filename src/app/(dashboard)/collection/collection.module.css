@@ -1,0 +1,28 @@
+.card {
+  text-decoration: none;
+  display: block;
+  cursor: pointer;
+  border-radius: var(--mantine-radius-md);
+  overflow: hidden;
+  transition: box-shadow 150ms ease, transform 150ms ease;
+}
+.card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+.card:hover .thumb {
+  transform: scale(1.04);
+}
+
+.thumb {
+  transition: transform 250ms ease;
+}
+
+.overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 40px 12px 12px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.72));
+}

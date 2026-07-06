@@ -34,18 +34,21 @@ const FOOTER = `
   color: #868e96;
 `;
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://coral-app-one.vercel.app';
+const APP_NAME = 'Coral Chest';
+
 function shell(title: string, body: string) {
   return `<!DOCTYPE html><html><body style="${BASE}">
 <div style="${CARD}">
   <div style="${HEADER}">
-    <span style="color:#fff;font-weight:700;font-size:18px;letter-spacing:-0.3px;">polyp</span>
+    <span style="color:#fff;font-weight:700;font-size:18px;letter-spacing:-0.3px;">${APP_NAME}</span>
   </div>
   <div style="${BODY}">
     <h2 style="margin:0 0 8px;font-size:20px;color:#212529;">${title}</h2>
     ${body}
   </div>
   <div style="${FOOTER}">
-    You received this because you have a Polyp account. If you didn't request this, you can safely ignore it.
+    You received this because you have a ${APP_NAME} account. If you didn't request this, you can safely ignore it.
   </div>
 </div>
 </body></html>`;
@@ -54,7 +57,7 @@ function shell(title: string, body: string) {
 export function verifyTemplate(url: string) {
   return shell('Verify your email', `
     <p style="color:#495057;margin:0 0 20px;line-height:1.6;">
-      Click the button below to confirm your email address and activate your Polyp account.
+      Click the button below to confirm your email address and activate your ${APP_NAME} account.
     </p>
     <a href="${url}" style="${BTN}">Verify email</a>
     <p style="color:#868e96;font-size:12px;margin:16px 0 0;">
@@ -66,7 +69,7 @@ export function verifyTemplate(url: string) {
 export function resetTemplate(url: string) {
   return shell('Reset your password', `
     <p style="color:#495057;margin:0 0 20px;line-height:1.6;">
-      Someone requested a password reset for your Polyp account. Click below to choose a new password.
+      Someone requested a password reset for your ${APP_NAME} account. Click below to choose a new password.
       This link expires in 1 hour.
     </p>
     <a href="${url}" style="${BTN}">Reset password</a>
@@ -77,10 +80,10 @@ export function resetTemplate(url: string) {
 }
 
 export function welcomeTemplate(username: string) {
-  return shell(`Welcome to Polyp, @${username}`, `
+  return shell(`Welcome to ${APP_NAME}, @${username}`, `
     <p style="color:#495057;margin:0 0 20px;line-height:1.6;">
-      Your first specimen is in the collection. Every coral has a story — this is yours to trace.
+      Your first coral is in the collection. Every piece has a story — this is yours to trace.
     </p>
-    <a href="${process.env.NEXT_PUBLIC_APP_URL}/collection" style="${BTN}">View my collection</a>
+    <a href="${APP_URL}/collection" style="${BTN}">View my collection</a>
   `);
 }

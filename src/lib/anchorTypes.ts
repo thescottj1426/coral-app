@@ -2,7 +2,7 @@ export type AnchorType = 'specimen' | 'line' | 'species' | 'photo' | 'listing' |
 
 export const ANCHOR_TYPE_CONFIG = {
   specimen: { label: 'Specimen',        hue: null as null },
-  line:     { label: 'Bloodline',        hue: 210 },
+  line:     { label: 'Lineage',           hue: 210 },
   species:  { label: 'Species / Morph',  hue: 140 },
   photo:    { label: 'Photo pin',        hue: 330 },
   listing:  { label: 'Listing',          hue: 40  },

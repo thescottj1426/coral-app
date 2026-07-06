@@ -15,14 +15,14 @@ export const auth = betterAuth({
   },
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: false,
+    requireEmailVerification: true,
     sendResetPassword: async ({ user, url }) => {
-      await sendEmail(user.email, 'Reset your Polyp password', resetTemplate(url));
+      await sendEmail(user.email, 'Reset your Coral Chest password', resetTemplate(url));
     },
   },
   emailVerification: {
     sendVerificationEmail: async ({ user, url }) => {
-      await sendEmail(user.email, 'Verify your Polyp account', verifyTemplate(url));
+      await sendEmail(user.email, 'Verify your Coral Chest account', verifyTemplate(url));
     },
   },
   session: {
@@ -37,13 +37,29 @@ export const auth = betterAuth({
         after: async (user) => {
           const raw = user.name ?? user.email?.split('@')[0] ?? 'user';
           const base = raw.toLowerCase().replace(/[^a-z0-9_-]/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '').slice(0, 20);
-          const username = base.length >= 3 ? base : base + '_' + Math.random().toString(36).slice(2, 5);
-          await pool.query(
-            `INSERT INTO "User" (id, "neonAuthId", username, email, "onboardingComplete", "isSeller", verified, plan, "updatedAt")
-             VALUES ($1, $2, $3, $4, false, false, false, 'FREE', NOW())
-             ON CONFLICT ("neonAuthId") DO NOTHING`,
-            [user.id, user.id, username, user.email]
-          );
+          const baseUsername = base.length >= 3 ? base : base + '_' + Math.random().toString(36).slice(2, 5);
+
+          // Retry with a random suffix if the username is already taken
+          let username = baseUsername;
+          for (let i = 0; i < 5; i++) {
+            try {
+              await pool.query(
+                `INSERT INTO public."User" (id, "neonAuthId", username, email, "onboardingComplete", "isSeller", verified, plan, "updatedAt")
+                 VALUES ($1, $2, $3, $4, false, false, false, 'FREE', NOW())
+                 ON CONFLICT (email) DO UPDATE SET
+                   "neonAuthId" = EXCLUDED."neonAuthId",
+                   "updatedAt" = NOW()`,
+                [user.id, user.id, username, user.email]
+              );
+              break;
+            } catch (e: any) {
+              if (e.constraint === 'User_username_key') {
+                username = baseUsername + '_' + Math.random().toString(36).slice(2, 5);
+              } else {
+                throw e;
+              }
+            }
+          }
         },
       },
     },

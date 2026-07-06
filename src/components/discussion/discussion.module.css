@@ -181,6 +181,77 @@
 }
 .pinNumSolved { background: var(--mantine-color-teal-6); }
 
+/* ---- discuss hub layout ---- */
+.hubGrid {
+  display: grid;
+  grid-template-columns: 260px 1fr 260px;
+  gap: 20px;
+  align-items: start;
+}
+.hubLeft {}
+.hubRight {}
+
+@media (max-width: 900px) {
+  .hubGrid {
+    grid-template-columns: 1fr;
+  }
+  .hubRight {
+    display: none;
+  }
+}
+
+/* anchor filter horizontal scroll strip (mobile) */
+.anchorScroll {
+  display: none;
+}
+@media (max-width: 900px) {
+  .hubLeft {
+    display: none;
+  }
+  .anchorScroll {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    margin-bottom: 16px;
+    scrollbar-width: none;
+  }
+  .anchorScroll::-webkit-scrollbar { display: none; }
+}
+
+/* sort row above thread list */
+.sortRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+@media (max-width: 480px) {
+  .sortRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* ---- thread detail layout ---- */
+.threadGrid {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 18px;
+  align-items: start;
+}
+@media (max-width: 768px) {
+  .threadGrid {
+    grid-template-columns: 1fr;
+  }
+}
+.threadRail {}
+@media (max-width: 768px) {
+  .threadRail {
+    display: none;
+  }
+}
+
 /* ---- anchor-type option (discuss hub sidebar + compose picker) ---- */
 /* ---- anchor-type cards (discuss hub sidebar + compose picker) ---- */
 .atypeOpt {

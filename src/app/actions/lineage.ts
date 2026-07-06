@@ -5,6 +5,16 @@ import { revalidatePath } from 'next/cache';
 import { auth } from '@/lib/auth';
 import { pool } from '@/lib/db';
 
+async function uniqueRFCode(): Promise<string> {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  for (let i = 0; i < 10; i++) {
+    const code = 'RF-' + Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    const { rows } = await pool.query('SELECT 1 FROM public."Coral" WHERE "rfCode" = $1', [code]);
+    if (rows.length === 0) return code;
+  }
+  throw new Error('Could not generate unique RF code');
+}
+
 async function getCurrentUser() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) throw new Error('Not authenticated');
@@ -55,17 +65,138 @@ export async function getChildren(specimenId: string): Promise<LineageNode[]> {
   return rows;
 }
 
+// fragKind = 'unclaimed_frag': this coral exists in DB with ownerId=NULL, ready to be claimed
+// fragKind = 'parent_coral': this is an owned coral; claiming creates a new child
+export type ParentCoralInfo = {
+  id: string;
+  name: string;
+  species: string | null;
+  category: string | null;
+  rfCode: string;
+  ownerUsername: string | null;
+  identityHue: number | null;
+  ancestors: LineageNode[];
+  fragKind: 'unclaimed_frag' | 'parent_coral';
+};
+
+export async function lookupParentCoral(rfCode: string): Promise<ParentCoralInfo | null> {
+  const normalized = rfCode.toUpperCase().trim();
+  const { rows } = await pool.query<{
+    id: string; name: string; species: string | null; category: string | null;
+    rfCode: string; identityHue: number | null; ownerId: string | null; ownerUsername: string | null;
+  }>(
+    `SELECT c.id, c.name, c.species, c.category, c."rfCode", c."identityHue", c."ownerId",
+            u.username AS "ownerUsername"
+     FROM public."Coral" c
+     LEFT JOIN public."User" u ON u.id = c."ownerId"
+     WHERE c."rfCode" = $1`,
+    [normalized]
+  );
+  if (!rows[0]) return null;
+  const { ownerId, ...coral } = rows[0];
+  const fragKind: ParentCoralInfo['fragKind'] = ownerId === null ? 'unclaimed_frag' : 'parent_coral';
+  const ancestors = await getLineage(coral.id);
+  return { ...coral, ancestors, fragKind };
+}
+
+export async function claimFrag(rfCode: string): Promise<{ coralId: string; coralRfCode: string } | { error: string }> {
+  const user = await getCurrentUser();
+  const normalized = rfCode.toUpperCase().trim();
+
+  // Check if it's a pre-generated unclaimed frag
+  const { rows: fragRows } = await pool.query<{ id: string; rfCode: string }>(
+    `SELECT id, "rfCode" FROM public."Coral" WHERE "rfCode" = $1 AND "ownerId" IS NULL`,
+    [normalized]
+  );
+
+  if (fragRows[0]) {
+    await pool.query(
+      `UPDATE public."Coral" SET "ownerId" = $1, "updatedAt" = NOW() WHERE id = $2`,
+      [user.id, fragRows[0].id]
+    );
+    revalidatePath('/collection');
+    revalidatePath('/dashboard');
+    return { coralId: fragRows[0].id, coralRfCode: fragRows[0].rfCode };
+  }
+
+  // Otherwise treat as a parent coral and create a child
+  const { rows: parentRows } = await pool.query<{
+    id: string; name: string; species: string | null; category: string | null;
+  }>(
+    `SELECT id, name, species, category FROM public."Coral" WHERE "rfCode" = $1 AND "ownerId" IS NOT NULL`,
+    [normalized]
+  );
+  if (!parentRows[0]) return { error: 'No coral found with that RF code' };
+
+  const parent = parentRows[0];
+  const newRfCode = await uniqueRFCode();
+  const identityHue = Math.floor(Math.random() * 360);
+
+  const { rows: childRows } = await pool.query<{ id: string; rfCode: string }>(
+    `INSERT INTO public."Coral"
+       (id, name, species, category, "rfCode", "ownerId", "identityHue", "updatedAt")
+     VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, NOW())
+     RETURNING id, "rfCode"`,
+    [parent.name, parent.species ?? null, parent.category ?? null, newRfCode, user.id, identityHue]
+  );
+  const child = childRows[0];
+
+  await pool.query(
+    `INSERT INTO public."Lineage" ("parentId", "childId") VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+    [parent.id, child.id]
+  );
+
+  revalidatePath('/collection');
+  revalidatePath('/dashboard');
+  return { coralId: child.id, coralRfCode: child.rfCode };
+}
+
+// Creates unclaimed child corals (ownerId=NULL) linked to parentId.
+// Called from FragModal — each code is a real DB record the recipient can claim.
+export async function createFrags(parentId: string, count: number): Promise<string[]> {
+  const user = await getCurrentUser();
+
+  const { rows: parentRows } = await pool.query<{ name: string; species: string | null; category: string | null }>(
+    'SELECT name, species, category FROM public."Coral" WHERE id = $1 AND "ownerId" = $2',
+    [parentId, user.id]
+  );
+  if (!parentRows[0]) throw new Error('Coral not found or not owned by you');
+
+  const parent = parentRows[0];
+  const codes: string[] = [];
+
+  for (let i = 0; i < count; i++) {
+    const rfCode = await uniqueRFCode();
+    const identityHue = Math.floor(Math.random() * 360);
+
+    const { rows } = await pool.query<{ id: string }>(
+      `INSERT INTO public."Coral"
+         (id, name, species, category, "rfCode", "ownerId", "identityHue", "updatedAt")
+       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, NULL, $5, NOW())
+       RETURNING id`,
+      [parent.name, parent.species ?? null, parent.category ?? null, rfCode, identityHue]
+    );
+
+    await pool.query(
+      'INSERT INTO public."Lineage" ("parentId", "childId") VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      [parentId, rows[0].id]
+    );
+
+    codes.push(rfCode);
+  }
+
+  return codes;
+}
+
 export async function claimParent(childId: string, parentRfCode: string): Promise<{ error?: string }> {
   const user = await getCurrentUser();
 
-  // Verify the child belongs to this user
   const { rows: childRows } = await pool.query(
     'SELECT id FROM public."Coral" WHERE id = $1 AND "ownerId" = $2',
     [childId, user.id]
   );
   if (childRows.length === 0) return { error: 'Specimen not found' };
 
-  // Look up the parent by RF code
   const { rows: parentRows } = await pool.query(
     'SELECT id FROM public."Coral" WHERE "rfCode" = $1',
     [parentRfCode.toUpperCase().trim()]

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { headers } from 'next/headers';
 import { Box, Group, Stack, Text, Paper, Badge } from '@mantine/core';
 import { IconChevronLeft, IconHeart, IconMessageCircle, IconEye } from '@tabler/icons-react';
+import styles from '@/components/discussion/discussion.module.css';
 import { getThread } from '@/app/actions/discussions';
 import { auth } from '@/lib/auth';
 import { coralIdentityGradient } from '@/theme/theme';
@@ -69,15 +70,15 @@ export default async function PublicThreadPage({ params }: Props) {
   ].slice(0, 8);
 
   return (
-    <Box maw={1080} pb="xl">
+    <Box maw={1080} pb="xl" px={{ base: 'sm', sm: 'md', lg: 0 }}>
       {/* Breadcrumb */}
-      <Group gap={4} mb="md" style={{ fontSize: 13, color: 'var(--mantine-color-dimmed)' }}>
+      <Group gap={4} mb="md" wrap="wrap" style={{ fontSize: 13, color: 'var(--mantine-color-dimmed)' }}>
         <Link href="/discuss" style={{ textDecoration: 'none', color: 'inherit' }}>Discussions</Link>
         <span>/</span>
         <span style={{ color: 'var(--mantine-color-text)', fontWeight: 500 }}>{thread.title}</span>
       </Group>
 
-      <Box style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 18, alignItems: 'start' }}>
+      <Box className={styles.threadGrid}>
 
         {/* ── Main column ── */}
         <Stack gap="md">
@@ -183,7 +184,7 @@ export default async function PublicThreadPage({ params }: Props) {
         </Stack>
 
         {/* ── Right rail ── */}
-        <Stack gap="md">
+        <Stack gap="md" className={styles.threadRail}>
           <Paper withBorder p="md">
             <Text size="sm" fw={600} mb={10}>About this thread</Text>
             <Stack gap={6}>
