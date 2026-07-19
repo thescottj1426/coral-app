@@ -18,8 +18,8 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Polyp',
-  description: 'Every coral has a story. Trace it.',
+  title: 'Coral Chest',
+  description: 'The collector\'s log for reef hobbyists. Log specimens, trace lineage, share your chest.',
 };
 
 export default function RootLayout({

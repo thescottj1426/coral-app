@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { IconArrowRight, IconLayoutGrid } from '@tabler/icons-react';
 import styles from './auth.module.css';
 
@@ -32,8 +33,8 @@ export function BrandPanel() {
 
         <div className={styles.lineageMotif}>
           {LINEAGE_CHIPS.map((chip, i) => (
-            <>
-              <div key={chip.code} className={styles.lineageChip}>
+            <Fragment key={chip.code}>
+              <div className={styles.lineageChip}>
                 <span
                   className={styles.coralDot}
                   style={{ background: coralDotGradient(chip.hue) }}
@@ -42,13 +43,12 @@ export function BrandPanel() {
               </div>
               {i < LINEAGE_CHIPS.length - 1 && (
                 <IconArrowRight
-                  key={`arrow-${i}`}
                   size={13}
                   className={styles.lineageArrow}
                   color="#fff"
                 />
               )}
-            </>
+            </Fragment>
           ))}
         </div>
         <p className={styles.lineageCaption}>

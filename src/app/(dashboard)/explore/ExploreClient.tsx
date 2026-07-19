@@ -58,16 +58,7 @@ function SpecimenCard({ s }: { s: ExploreSpecimen }) {
           >
             {s.ownerUsername[0].toUpperCase()}
           </Avatar>
-          <Anchor
-            component={Link}
-            href={`/u/${s.ownerUsername}`}
-            size="xs"
-            c="dimmed"
-            truncate
-            onClick={(e) => e.stopPropagation()}
-          >
-            @{s.ownerUsername}
-          </Anchor>
+          <Text size="xs" c="dimmed" truncate>@{s.ownerUsername}</Text>
         </Group>
       </Stack>
     </Paper>

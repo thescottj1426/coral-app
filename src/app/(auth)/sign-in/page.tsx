@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { auth } from '@/lib/auth';
@@ -14,7 +15,9 @@ export default async function SignInPage() {
   return (
     <div className={styles.root}>
       <BrandPanel />
-      <SignInForm />
+      <Suspense fallback={null}>
+        <SignInForm />
+      </Suspense>
     </div>
   );
 }

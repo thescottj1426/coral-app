@@ -59,6 +59,34 @@ export async function reviewPhoto(
   revalidatePath('/admin/photos');
 }
 
+export type ReviewedPhoto = PendingPhoto & {
+  status: 'approved' | 'rejected';
+  reviewedAt: string;
+  reviewNote: string | null;
+  reviewerUsername: string | null;
+};
+
+export async function getPhotoHistory(limit = 100): Promise<ReviewedPhoto[]> {
+  await getCurrentAdmin();
+  const { rows } = await pool.query<ReviewedPhoto>(
+    `SELECT
+       p.id, p."s3Key", '/api/image?key=' || p."s3Key" AS url, p."createdAt",
+       p.status, p."reviewedAt", p."reviewNote",
+       c.id AS "coralId", c.name AS "coralName", c."rfCode" AS "coralRfCode",
+       u.username AS "ownerUsername", u."displayName" AS "ownerDisplayName",
+       r.username AS "reviewerUsername"
+     FROM public."CoralPhoto" p
+     JOIN public."Coral" c ON c.id = p."coralId"
+     JOIN public."User" u ON u.id = c."ownerId"
+     LEFT JOIN public."User" r ON r.id = p."reviewedBy"
+     WHERE p.status IN ('approved', 'rejected')
+     ORDER BY p."reviewedAt" DESC
+     LIMIT $1`,
+    [limit]
+  );
+  return rows;
+}
+
 export type OpenReport = {
   id: string;
   targetType: 'coral' | 'user' | 'thread' | 'reply';

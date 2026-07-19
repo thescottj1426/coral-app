@@ -9,7 +9,16 @@ import {
   Text,
   Paper,
   SimpleGrid,
+  ThemeIcon,
 } from '@mantine/core';
+import {
+  IconSeeding,
+  IconArrowRight,
+  IconArrowLeft,
+  IconMessageCircle,
+  IconCompass,
+  IconPlus,
+} from '@tabler/icons-react';
 import { auth } from '@/lib/auth';
 import { pool } from '@/lib/db';
 import styles from './dashboard.module.css';
@@ -35,14 +44,23 @@ function coralGradient(seed: string, hue?: number | null) {
   return coralIdentityGradient(seed);
 }
 
-function KpiCard({ value, label, sub }: { value: number; label: string; sub?: string }) {
+function KpiCard({ value, label, icon, color }: {
+  value: number;
+  label: string;
+  icon: React.ReactNode;
+  color: string;
+}) {
   return (
-    <Paper withBorder p="sm">
-      <Text style={{ fontSize: 22, fontFamily: 'var(--font-sora)', fontWeight: 700, lineHeight: 1.1 }}>
+    <Paper withBorder p="md" className={styles.kpiCard}>
+      <Group justify="space-between" align="flex-start" mb={8}>
+        <ThemeIcon size={36} radius="md" color={color} variant="light">
+          {icon}
+        </ThemeIcon>
+      </Group>
+      <Text style={{ fontSize: 28, fontFamily: 'var(--font-sora)', fontWeight: 700, lineHeight: 1 }}>
         {value}
       </Text>
-      <Text size="xs" c="dimmed" fw={500} mt={2}>{label}</Text>
-      {sub && <Text size="xs" c="teal.6" mt={4} lineClamp={1}>{sub}</Text>}
+      <Text size="xs" c="dimmed" fw={500} mt={4}>{label}</Text>
     </Paper>
   );
 }
@@ -52,18 +70,18 @@ function RecentCoralCard({ coral }: { coral: DashboardCoral }) {
   return (
     <Link href={href} className={styles.coralCard}>
       <Paper withBorder style={{ overflow: 'hidden' }}>
-        <Box style={{ height: 140, position: 'relative', overflow: 'hidden' }}>
+        <Box style={{ height: 180, position: 'relative', overflow: 'hidden' }}>
           {coral.coverUrl ? (
             <Image src={coral.coverUrl} alt={coral.name} fill style={{ objectFit: 'cover' }} sizes="25vw" />
           ) : (
-            <Box style={{ height: 140, background: coralGradient(coral.id, coral.identityHue) }} />
+            <Box style={{ height: 180, background: coralGradient(coral.id, coral.identityHue) }} />
           )}
           <Box style={{
             position: 'absolute', bottom: 0, left: 0, right: 0,
-            padding: '28px 8px 8px',
-            background: 'linear-gradient(transparent, rgba(0,0,0,0.65))',
+            padding: '32px 10px 10px',
+            background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
           }}>
-            <Text size="xs" fw={700} truncate style={{ color: '#fff', lineHeight: 1.3 }}>{coral.name}</Text>
+            <Text size="sm" fw={700} truncate style={{ color: '#fff', lineHeight: 1.3 }}>{coral.name}</Text>
             {coral.category && (
               <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', marginTop: 2 }}>{coral.category}</Text>
             )}
@@ -73,6 +91,12 @@ function RecentCoralCard({ coral }: { coral: DashboardCoral }) {
     </Link>
   );
 }
+
+const ACTIVITY_COLORS: Record<string, string> = {
+  coral: 'var(--mantine-color-ocean-5)',
+  lineage: 'var(--mantine-color-teal-5)',
+  listing: 'var(--mantine-color-orange-5)',
+};
 
 function ActivityRow({ item, first }: { item: MyActivity; first: boolean }) {
   const description =
@@ -91,6 +115,10 @@ function ActivityRow({ item, first }: { item: MyActivity; first: boolean }) {
       wrap="nowrap"
       style={first ? undefined : { borderTop: '1px solid var(--mantine-color-default-border)' }}
     >
+      <Box style={{
+        width: 8, height: 8, borderRadius: '50%', flexShrink: 0, marginTop: 2,
+        background: ACTIVITY_COLORS[item.kind] ?? 'var(--mantine-color-gray-4)',
+      }} />
       <Text size="xs" style={{ flex: 1, lineHeight: 1.4 }}>{description}</Text>
       {item.specimenRfCode && (
         <Text size="xs" style={{ fontFamily: 'var(--font-ibm-plex-mono), monospace', color: 'var(--mantine-color-dimmed)', flexShrink: 0 }}>
@@ -135,7 +163,7 @@ export default async function DashboardPage() {
 
   const [stats, recentCorals, listings, activity, userRow] = await Promise.all([
     getDashboardStats(userId),
-    getRecentCorals(userId, 4),
+    getRecentCorals(userId, 8),
     getMyListings(userId),
     getMyActivity(userId, 8),
     pool.query<{ displayName: string | null; username: string }>(
@@ -147,40 +175,65 @@ export default async function DashboardPage() {
   const user = userRow.rows[0];
   const fullName = user?.displayName ?? session.user.name ?? user?.username ?? 'there';
   const firstName = fullName.split(' ')[0];
-  const weekday = new Date().toLocaleDateString('en-US', { weekday: 'long' });
 
   return (
     <Box p={{ base: 'sm', md: 'lg' }} maw={1400}>
-      {/* Header */}
-      <Group justify="space-between" align="flex-start" mb="md">
-        <div>
-          <Text
-            component="h1"
-            style={{ fontSize: 26, fontFamily: 'var(--font-sora)', fontWeight: 600, margin: 0 }}
-          >
-            Welcome back, {firstName}
-          </Text>
-          <Text size="sm" c="dimmed" mt={2}>
-            {weekday}
-          </Text>
-        </div>
-        <AddCoralButton />
-      </Group>
+      {/* Hero */}
+      <Paper withBorder p="lg" mb="md" className={styles.hero}>
+        <Group justify="space-between" align="center">
+          <div>
+            <Text
+              component="h1"
+              style={{ fontSize: 24, fontFamily: 'var(--font-sora)', fontWeight: 700, margin: 0, lineHeight: 1.2 }}
+            >
+              {firstName}&apos;s reef
+            </Text>
+            <Text size="sm" c="dimmed" mt={4}>
+              {stats.coralCount === 0
+                ? 'Start building your collection'
+                : `${stats.coralCount} specimen${stats.coralCount === 1 ? '' : 's'} catalogued`}
+            </Text>
+          </div>
+          <AddCoralButton />
+        </Group>
+      </Paper>
 
       {/* KPIs */}
       <SimpleGrid cols={{ base: 2, md: 4 }} mb="md" spacing="sm">
-        <KpiCard value={stats.coralCount} label="Corals" />
-        <KpiCard
-          value={stats.fragsProduced}
-          label="Frags given"
-          sub={stats.fragsProduced > 0 ? "in other keepers' hands" : undefined}
-        />
-        <KpiCard
-          value={stats.fragsReceived}
-          label="Frags received"
-          sub={stats.fragsReceived > 0 ? 'corals with a lineage' : undefined}
-        />
-        <KpiCard value={stats.threadCount} label="Threads started" />
+        <KpiCard value={stats.coralCount} label="Corals" icon={<IconSeeding size={18} />} color="ocean" />
+        <KpiCard value={stats.fragsProduced} label="Frags given" icon={<IconArrowRight size={18} />} color="teal" />
+        <KpiCard value={stats.fragsReceived} label="Frags received" icon={<IconArrowLeft size={18} />} color="violet" />
+        <KpiCard value={stats.threadCount} label="Threads" icon={<IconMessageCircle size={18} />} color="orange" />
+      </SimpleGrid>
+
+      {/* Quick actions */}
+      <SimpleGrid cols={{ base: 1, sm: 2 }} mb="md" spacing="sm">
+        <Link href="/explore" style={{ textDecoration: 'none' }}>
+          <Paper withBorder p="md" className={styles.quickAction}>
+            <Group gap="sm">
+              <ThemeIcon size={36} radius="md" color="ocean" variant="light">
+                <IconCompass size={18} />
+              </ThemeIcon>
+              <div>
+                <Text size="sm" fw={600}>Explore community</Text>
+                <Text size="xs" c="dimmed">Browse specimens from other keepers</Text>
+              </div>
+            </Group>
+          </Paper>
+        </Link>
+        <Link href="/discuss" style={{ textDecoration: 'none' }}>
+          <Paper withBorder p="md" className={styles.quickAction}>
+            <Group gap="sm">
+              <ThemeIcon size={36} radius="md" color="teal" variant="light">
+                <IconMessageCircle size={18} />
+              </ThemeIcon>
+              <div>
+                <Text size="sm" fw={600}>Community discussions</Text>
+                <Text size="xs" c="dimmed">Ask questions, share knowledge</Text>
+              </div>
+            </Group>
+          </Paper>
+        </Link>
       </SimpleGrid>
 
       {/* Main grid */}
@@ -196,14 +249,18 @@ export default async function DashboardPage() {
               </Link>
             </Group>
             {recentCorals.length > 0 ? (
-              <SimpleGrid cols={2} spacing="xs">
+              <SimpleGrid cols={{ base: 2, md: 4 }} spacing="xs">
                 {recentCorals.map((c) => (
                   <RecentCoralCard key={c.id} coral={c} />
                 ))}
               </SimpleGrid>
             ) : (
-              <Paper withBorder p="md">
-                <Text size="sm" c="dimmed">No corals yet — add your first one above.</Text>
+              <Paper withBorder p="xl" style={{ textAlign: 'center' }}>
+                <ThemeIcon size={48} radius="xl" color="ocean" variant="light" mx="auto" mb="sm">
+                  <IconPlus size={24} />
+                </ThemeIcon>
+                <Text size="sm" fw={500} mb={4}>Your chest is empty</Text>
+                <Text size="xs" c="dimmed">Add your first specimen to start building your collection</Text>
               </Paper>
             )}
           </div>
@@ -221,7 +278,7 @@ export default async function DashboardPage() {
                 <ActivityRow key={item.id} item={item} first={i === 0} />
               ))
             ) : (
-              <Text size="sm" c="dimmed" pt={4}>No activity yet — add a coral to get started.</Text>
+              <Text size="sm" c="dimmed" pt={4}>No activity yet — add your first specimen to get started.</Text>
             )}
           </Paper>
         </Stack>

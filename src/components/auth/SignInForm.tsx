@@ -13,7 +13,7 @@ import {
 import { useForm, schemaResolver } from '@mantine/form';
 import { z } from 'zod';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { signIn, authClient } from '@/lib/auth-client';
 import styles from './auth.module.css';
@@ -28,7 +28,10 @@ type FormValues = z.infer<typeof schema>;
 
 export function SignInForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const passwordReset = searchParams.get('reset') === '1';
   const [error, setError] = useState<string | null>(null);
+  const [failCount, setFailCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
   const [resendSent, setResendSent] = useState(false);
@@ -54,6 +57,7 @@ export function SignInForm() {
         if (result.error.code === 'EMAIL_NOT_VERIFIED') {
           setUnverifiedEmail(values.email);
         } else {
+          setFailCount((n) => n + 1);
           setError(result.error.message ?? 'Invalid email or password');
         }
       } else {
@@ -111,8 +115,18 @@ export function SignInForm() {
           </Text>
         </div>
 
+        {passwordReset && (
+          <Text c="teal.7" size="sm" fw={500}>Password updated — sign in below.</Text>
+        )}
+
         {error && (
           <Text c="red" size="sm">{error}</Text>
+        )}
+
+        {failCount >= 2 && (
+          <Button component={Link} href="/forgot-password" variant="light" color="ocean" fullWidth>
+            Forgot your password?
+          </Button>
         )}
 
         <TextInput

@@ -1,7 +1,7 @@
 import { betterAuth } from 'better-auth';
 import { Pool } from '@neondatabase/serverless';
 import { sendEmail } from './email';
-import { verifyTemplate, resetTemplate } from './emailTemplates';
+import { verifyTemplate, resetTemplate, welcomeTemplate } from './emailTemplates';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
@@ -51,6 +51,7 @@ export const auth = betterAuth({
                    "updatedAt" = NOW()`,
                 [user.id, user.id, username, user.email]
               );
+              await sendEmail(user.email, `Welcome to Coral Chest`, welcomeTemplate(username));
               break;
             } catch (e: any) {
               if (e.constraint === 'User_username_key') {

@@ -12,7 +12,7 @@ import {
   Text,
 } from '@mantine/core';
 import {
-  IconLayoutGrid,
+  IconSeeding,
   IconSearch,
   IconBell,
   IconUser,
@@ -54,9 +54,9 @@ export function AppHeader({ mobileNavOpen, onBurger }: AppHeaderProps) {
 
       <Link href="/" className={styles.logo}>
         <span className={styles.logoMark}>
-          <IconLayoutGrid size={13} stroke={2.2} color="#fff" />
+          <IconSeeding size={13} stroke={2.2} color="#fff" />
         </span>
-        polyp
+        Coral Chest
       </Link>
 
       <form

@@ -111,6 +111,34 @@ export type SpecimenDetail = SpecimenRow & {
   photos: Array<{ id: string; url: string; s3Key: string; status: string }>;
 };
 
+export async function getPublicSpecimen(rfCodeOrId: string): Promise<SpecimenDetail | null> {
+  const { rows } = await pool.query<SpecimenDetail>(
+    `SELECT
+       c.id, c.name, c.species, c.category, c."rfCode", c.origin, c.notes,
+       c."identityHue", c."acquiredDate", c."createdAt",
+       c."ownerId",
+       u.username AS "ownerUsername",
+       u."displayName" AS "ownerDisplayName",
+       false AS "isOwner",
+       NULL AS "coverPhotoUrl",
+       COALESCE(
+         json_agg(
+           json_build_object('id', p.id, 'url', '/api/image?key=' || p."s3Key", 's3Key', p."s3Key", 'status', p.status)
+           ORDER BY p."createdAt" ASC
+         ) FILTER (WHERE p.id IS NOT NULL AND p.status = 'approved'),
+         '[]'
+       ) AS photos
+     FROM public."Coral" c
+     JOIN public."User" u ON u.id = c."ownerId"
+     LEFT JOIN public."CoralPhoto" p ON p."coralId" = c.id
+     WHERE c."rfCode" = $1 OR c.id = $1
+     GROUP BY c.id, u.username, u."displayName"
+     LIMIT 1`,
+    [rfCodeOrId]
+  );
+  return rows[0] ?? null;
+}
+
 export async function getSpecimen(rfCodeOrId: string): Promise<SpecimenDetail | null> {
   const session = await auth.api.getSession({ headers: await headers() }).catch(() => null);
   const viewerId = session?.user?.id ?? null;
@@ -158,6 +186,30 @@ export async function updateSpecimen(id: string, data: {
   );
   revalidatePath('/collection');
   revalidatePath(`/collection/${id}`);
+}
+
+export type PublicSpecimenStub = {
+  id: string;
+  name: string;
+  rfCode: string | null;
+  identityHue: number | null;
+  category: string | null;
+  coverPhotoUrl: string | null;
+};
+
+export async function getMoreByOwner(ownerId: string, excludeId: string, limit = 4): Promise<PublicSpecimenStub[]> {
+  const { rows } = await pool.query<PublicSpecimenStub>(
+    `SELECT c.id, c.name, c."rfCode", c."identityHue", c.category,
+       (SELECT '/api/image?key=' || p."s3Key" FROM public."CoralPhoto" p
+        WHERE p."coralId" = c.id AND p.status = 'approved'
+        ORDER BY p."createdAt" ASC LIMIT 1) AS "coverPhotoUrl"
+     FROM public."Coral" c
+     WHERE c."ownerId" = $1 AND c.id != $2
+     ORDER BY c."createdAt" DESC
+     LIMIT $3`,
+    [ownerId, excludeId, limit]
+  );
+  return rows;
 }
 
 export async function deleteSpecimen(id: string): Promise<void> {

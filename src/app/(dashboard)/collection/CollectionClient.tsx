@@ -166,7 +166,7 @@ export function CollectionClient({ specimens }: CollectionClientProps) {
           <Tabs.Panel key={t.value} value={t.value} pt="md">
             {tabSpecimens(t.value).length === 0 ? (
               <Text c="dimmed" size="sm" ta="center" py="xl">
-                {search ? 'No specimens match your search.' : 'No specimens here yet.'}
+                {search ? 'No specimens match your search.' : 'Your chest is empty — add your first specimen.'}
               </Text>
             ) : (
               <SimpleGrid cols={GRID} spacing="sm">

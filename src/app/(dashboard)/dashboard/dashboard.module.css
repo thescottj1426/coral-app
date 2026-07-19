@@ -1,3 +1,24 @@
+.hero {
+  border-left: 3px solid var(--mantine-color-ocean-5);
+}
+
+.kpiCard {
+  transition: box-shadow 150ms ease, transform 150ms ease;
+}
+.kpiCard:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.quickAction {
+  cursor: pointer;
+  transition: box-shadow 150ms ease, transform 150ms ease;
+}
+.quickAction:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10);
+}
+
 .mainGrid {
   display: grid;
   grid-template-columns: 1fr;

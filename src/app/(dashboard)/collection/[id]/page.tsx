@@ -37,9 +37,9 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const specimen = await getSpecimen(id);
-  if (!specimen) return { title: 'Not found — Polyp' };
+  if (!specimen) return { title: 'Not found — Coral Chest' };
   return {
-    title: `${specimen.name} — Polyp`,
+    title: `${specimen.name} — Coral Chest`,
     description: specimen.notes ?? `A ${specimen.category ?? 'coral'} specimen by @${specimen.ownerUsername}`,
   };
 }
@@ -56,7 +56,6 @@ export default async function SpecimenDetailPage({ params }: Props) {
   const isOwner = session?.user?.id === specimen.ownerId;
 
   const coverPhoto = specimen.photos[0] ?? null;
-  const coverIsPending = isOwner && coverPhoto?.status === 'pending';
 
   return (
     <Box maw={1100}>
