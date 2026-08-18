@@ -62,6 +62,7 @@ export type ParentCoralInfo = {
   identityHue: number | null;
   ancestors: LineageNode[];
   fragKind: 'unclaimed_frag' | 'parent_coral';
+  isOwn: boolean;
 };
 
 export async function lookupParentCoral(rfCode: string): Promise<ParentCoralInfo | null> {
@@ -80,8 +81,9 @@ export async function lookupParentCoral(rfCode: string): Promise<ParentCoralInfo
   if (!rows[0]) return null;
   const { ownerId, ...coral } = rows[0];
   const fragKind: ParentCoralInfo['fragKind'] = ownerId === null ? 'unclaimed_frag' : 'parent_coral';
+  const user = await getCurrentUser();
   const ancestors = await getLineage(coral.id);
-  return { ...coral, ancestors, fragKind };
+  return { ...coral, ancestors, fragKind, isOwn: ownerId === user.id };
 }
 
 export async function claimFrag(rfCode: string): Promise<{ coralId: string; coralRfCode: string } | { error: string }> {
@@ -114,6 +116,10 @@ export async function claimFrag(rfCode: string): Promise<{ coralId: string; cora
   if (!parentRows[0]) return { error: 'No coral found with that RF code' };
 
   const parent = parentRows[0];
+  if (parent.ownerId === user.id) {
+    return { error: 'This is your own coral — log a frag from it instead of claiming it.' };
+  }
+
   const newRfCode = await uniqueRFCode();
   const identityHue = Math.floor(Math.random() * 360);
 

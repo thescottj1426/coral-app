@@ -161,6 +161,7 @@ function ClaimContent() {
   const [isClaiming, startClaim] = useTransition();
 
   const normalized = code.toUpperCase().trim();
+  const blockedSelfClaim = !!parent && parent.isOwn && parent.fragKind === 'parent_coral';
 
   useEffect(() => {
     if (searchParams.get('code')) handleLookup();
@@ -243,8 +244,16 @@ function ClaimContent() {
           </Alert>
         )}
 
+        {/* Own coral — claiming would mint a duplicate of yourself */}
+        {blockedSelfClaim && (
+          <Alert icon={<IconAlertCircle size={16} />} color="orange" variant="light">
+            {parent?.name} is already in your collection. To keep a frag of it as its own
+            specimen, use the frag logger on that coral instead.
+          </Alert>
+        )}
+
         {/* Found */}
-        {parent && (
+        {parent && !blockedSelfClaim && (
           <>
             <Paper p="md" style={{ background: 'var(--mantine-color-teal-0)', border: '1px solid var(--mantine-color-teal-3)' }}>
               <Group gap={12} wrap="nowrap">
@@ -295,9 +304,9 @@ function ClaimContent() {
             fullWidth
             size="md"
             style={{ height: 44 }}
-            disabled={!parent}
+            disabled={!parent || blockedSelfClaim}
             loading={isClaiming}
-            leftSection={parent ? <IconCheck size={16} /> : undefined}
+            leftSection={parent && !blockedSelfClaim ? <IconCheck size={16} /> : undefined}
             onClick={handleClaim}
           >
             Claim this frag
