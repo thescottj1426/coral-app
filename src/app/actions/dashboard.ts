@@ -16,6 +16,7 @@ export type DashboardCoral = {
   identityHue: number | null;
   category: string | null;
   coverUrl: string | null;
+  coverPending: boolean | null;
   createdAt: string;
 };
 
@@ -45,10 +46,8 @@ export async function getDashboardStats(userId: string): Promise<DashboardStats>
 export async function getRecentCorals(userId: string, limit = 4): Promise<DashboardCoral[]> {
   const { rows } = await pool.query<DashboardCoral>(
     `SELECT c.id, c.name, c."rfCode", c."identityHue", c.category, c."createdAt",
-       (SELECT '/api/image?key=' || p."s3Key"
-        FROM public."CoralPhoto" p
-        WHERE p."coralId" = c.id AND p.status = 'approved'
-        ORDER BY p."createdAt" ASC LIMIT 1) AS "coverUrl"
+       (SELECT '/api/image?key=' || p."s3Key" FROM public."CoralPhoto" p WHERE p."coralId" = c.id ORDER BY CASE WHEN p.status = 'approved' THEN 0 ELSE 1 END, p."createdAt" ASC LIMIT 1) AS "coverUrl",
+       (SELECT p.status = 'pending' FROM public."CoralPhoto" p WHERE p."coralId" = c.id ORDER BY CASE WHEN p.status = 'approved' THEN 0 ELSE 1 END, p."createdAt" ASC LIMIT 1) AS "coverPending"
      FROM public."Coral" c
      WHERE c."ownerId" = $1
      ORDER BY c."createdAt" DESC

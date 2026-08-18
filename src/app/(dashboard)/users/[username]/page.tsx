@@ -15,9 +15,6 @@ import {
   IconMapPin,
   IconCalendar,
   IconCheck,
-  IconEdit,
-  IconMessage,
-  IconCamera,
   IconTruck,
   IconLeaf,
   IconChevronRight,
@@ -210,9 +207,6 @@ export default async function UserProfilePage({
         {p.shopBio && (
           <Text size="xs" c="ocean.7">{p.shopBio}</Text>
         )}
-        <Button size="xs" variant="light" color="ocean" fullWidth mt={10}>
-          Visit shop
-        </Button>
       </Paper>
     );
   }
@@ -318,14 +312,7 @@ export default async function UserProfilePage({
       {/* Header card */}
       <Paper withBorder style={{ overflow: 'hidden' }} mb="md">
         {/* Cover */}
-        <div className={css.cover} style={{ background: coverGrad }}>
-          {own && (
-            <button className={css.editCoverBtn}>
-              <IconCamera size={13} />
-              Edit cover
-            </button>
-          )}
-        </div>
+        <div className={css.cover} style={{ background: coverGrad }} />
 
         {/* Identity */}
         <div className={css.identity}>
@@ -370,12 +357,7 @@ export default async function UserProfilePage({
                 specialty: p.specialty,
               }} />
             ) : (
-              <>
-                <Button variant="default" size="sm" leftSection={<IconMessage size={14} />}>
-                  Message
-                </Button>
-                <FollowButton targetUserId={p.id} initialFollowing={isFollowing} />
-              </>
+              <FollowButton targetUserId={p.id} initialFollowing={isFollowing} />
             )}
           </div>
         </div>

@@ -1,25 +1,10 @@
 'use server';
 
-import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
-import { auth } from '@/lib/auth';
 import { pool } from '@/lib/db';
-
-async function uniqueRFCode(): Promise<string> {
-  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-  for (let i = 0; i < 10; i++) {
-    const code = 'RF-' + Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-    const { rows } = await pool.query('SELECT 1 FROM public."Coral" WHERE "rfCode" = $1', [code]);
-    if (rows.length === 0) return code;
-  }
-  throw new Error('Could not generate unique RF code');
-}
-
-async function getCurrentUser() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user) throw new Error('Not authenticated');
-  return session.user;
-}
+import { getCurrentUser } from '@/lib/getCurrentUser';
+import { uniqueRFCode } from '@/lib/rfCode';
+import { createNotification } from '@/app/actions/notifications';
 
 export type LineageNode = {
   id: string;
@@ -121,9 +106,9 @@ export async function claimFrag(rfCode: string): Promise<{ coralId: string; cora
 
   // Otherwise treat as a parent coral and create a child
   const { rows: parentRows } = await pool.query<{
-    id: string; name: string; species: string | null; category: string | null;
+    id: string; name: string; species: string | null; category: string | null; ownerId: string;
   }>(
-    `SELECT id, name, species, category FROM public."Coral" WHERE "rfCode" = $1 AND "ownerId" IS NOT NULL`,
+    `SELECT id, name, species, category, "ownerId" FROM public."Coral" WHERE "rfCode" = $1 AND "ownerId" IS NOT NULL`,
     [normalized]
   );
   if (!parentRows[0]) return { error: 'No coral found with that RF code' };
@@ -145,6 +130,14 @@ export async function claimFrag(rfCode: string): Promise<{ coralId: string; cora
     `INSERT INTO public."Lineage" ("parentId", "childId") VALUES ($1, $2) ON CONFLICT DO NOTHING`,
     [parent.id, child.id]
   );
+
+  createNotification({
+    userId: parent.ownerId,
+    type: 'FRAG_CLAIMED',
+    fromUserId: user.id,
+    targetType: 'CORAL',
+    targetId: parent.id,
+  }).catch((err) => console.error('[lineage] frag-claimed notification failed:', err));
 
   revalidatePath('/collection');
   revalidatePath('/dashboard');

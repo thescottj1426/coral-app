@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { IconCircleCheck, IconHeart, IconCornerUpLeft } from '@tabler/icons-react';
+import { IconCircleCheck } from '@tabler/icons-react';
 import { markBestAnswer } from '@/app/actions/discussions';
 import type { ReplyRow } from '@/app/actions/discussions';
 import { coralIdentityGradient } from '@/theme/theme';
@@ -63,12 +63,6 @@ export function ReplyItem({ reply, threadId, specimenId, isAuthor, threadResolve
         <p className={styles.rText}>{reply.body}</p>
 
         <div className={styles.rActs}>
-          <span>
-            <IconHeart size={13} /> {reply.likes}
-          </span>
-          <span>
-            <IconCornerUpLeft size={13} /> Reply
-          </span>
           {isAuthor && !threadResolved && !localBest && (
             <span
               style={{ color: 'var(--mantine-color-teal-7)', opacity: isPending ? 0.5 : 1 }}

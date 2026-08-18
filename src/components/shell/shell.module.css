@@ -105,22 +105,81 @@
   }
 }
 
-/* ---------- Navbar ---------- */
-.nav {
+/* ---------- Tab nav (header, desktop) ---------- */
+.tabNav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.tabLink {
+  padding: 6px 12px;
+  border-radius: var(--fb-radius);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--mantine-color-dimmed);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.15s, background 0.15s;
+}
+
+.tabLink:hover {
+  color: var(--mantine-color-text);
+  background: var(--mantine-color-default-hover);
+}
+
+.tabLinkActive {
+  color: var(--mantine-color-ocean-6);
+  background: var(--mantine-color-ocean-0);
+}
+
+@media (max-width: 768px) {
+  .tabNav { display: none; }
+}
+
+/* ---------- Bottom nav (mobile only) ---------- */
+.bottomNav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: var(--mantine-color-body);
+  border-top: 1px solid var(--mantine-color-default-border);
+  z-index: 200;
+}
+
+@media (max-width: 768px) {
+  .bottomNav { display: flex; }
+}
+
+.bottomNavItem {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 12px 8px;
-  height: 100%;
-  overflow-y: auto;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  text-decoration: none;
+  color: var(--mantine-color-dimmed);
+  font-size: 10px;
+  font-weight: 500;
+  padding: 6px 4px;
+  transition: color 0.15s;
 }
 
-.navSection {
-  margin-top: 12px;
-  margin-bottom: 2px;
-  padding: 0 8px;
+.bottomNavItemActive {
+  color: var(--mantine-color-ocean-6);
 }
 
+/* Mobile: extra bottom padding so content clears the bottom nav */
+@media (max-width: 768px) {
+  .main { padding-bottom: 68px !important; }
+}
+
+/* ---------- Eyebrow label ---------- */
 .eyebrow {
   font-family: var(--font-ibm-plex-mono), monospace;
   font-size: 10px;

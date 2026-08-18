@@ -10,6 +10,7 @@ import {
   Badge,
   Tabs,
   TextInput,
+  Stack,
 } from '@mantine/core';
 import { IconPlus, IconSearch } from '@tabler/icons-react';
 import { useState, useTransition } from 'react';
@@ -19,16 +20,15 @@ import { CategoryBadge } from '@/components/specimen/CategoryBadge';
 import { SpecimenThumb } from '@/components/specimen/SpecimenThumb';
 import { AddSpecimenDrawer } from '@/components/specimen/AddSpecimenDrawer';
 import { createSpecimen, type SpecimenRow } from '@/app/actions/specimens';
+import { ClaimWidget } from '@/components/dashboard/ClaimWidget';
 import Image from 'next/image';
 import styles from './collection.module.css';
+import type { DashboardStats, MyListing } from '@/app/actions/dashboard';
 
 function SpecimenCard({ specimen }: { specimen: SpecimenRow }) {
   const thumb = specimen.rfCode ?? specimen.id;
   return (
-    <Link
-      href={`/collection/${specimen.rfCode ?? specimen.id}`}
-      className={styles.card}
-    >
+    <Link href={`/collection/${specimen.rfCode ?? specimen.id}`} className={styles.card}>
       <Paper withBorder style={{ overflow: 'hidden' }}>
         <div style={{ width: '100%', height: 240, position: 'relative', overflow: 'hidden' }}>
           {specimen.coverPhotoUrl ? (
@@ -44,6 +44,11 @@ function SpecimenCard({ specimen }: { specimen: SpecimenRow }) {
             <div className={styles.thumb} style={{ width: '100%', height: '100%' }}>
               <SpecimenThumb rfCode={thumb} size={0} style={{ width: '100%', height: '100%', borderRadius: 0 }} />
             </div>
+          )}
+          {specimen.coverPhotoPending && (
+            <Box style={{ position: 'absolute', top: 8, right: 8, zIndex: 1 }}>
+              <Badge size="xs" color="yellow" variant="filled" radius="sm">Pending review</Badge>
+            </Box>
           )}
           <div className={styles.overlay}>
             <Text size="md" fw={700} truncate style={{ color: '#fff', lineHeight: 1.3 }}>
@@ -64,27 +69,89 @@ function SpecimenCard({ specimen }: { specimen: SpecimenRow }) {
   );
 }
 
+function KpiRow({ stats }: { stats: DashboardStats }) {
+  const items = [
+    { value: stats.coralCount, label: 'corals' },
+    { value: stats.fragsProduced, label: 'frags given' },
+    { value: stats.fragsReceived, label: 'frags received' },
+    { value: stats.threadCount, label: 'threads' },
+  ];
+  return (
+    <Paper withBorder p="sm" mb="md">
+      <SimpleGrid cols={{ base: 2, sm: 4 }} spacing={0}>
+        {items.map((item, i) => (
+          <Box key={item.label}
+            style={{
+              textAlign: 'center', padding: '8px 0',
+              borderRight: i < items.length - 1 ? '1px solid var(--mantine-color-default-border)' : undefined,
+            }}>
+            <Text style={{ fontSize: 24, fontFamily: 'var(--font-sora)', fontWeight: 700, lineHeight: 1 }}>
+              {item.value}
+            </Text>
+            <Text size="xs" c="dimmed" mt={2}>{item.label}</Text>
+          </Box>
+        ))}
+      </SimpleGrid>
+    </Paper>
+  );
+}
+
+function ListingsPanel({ listings }: { listings: MyListing[] }) {
+  if (listings.length === 0) return null;
+  return (
+    <Paper withBorder p="md" mb="md">
+      <Text size="xs" fw={500} c="dimmed" style={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'var(--font-ibm-plex-mono), monospace', marginBottom: 8 }}>
+        your listings
+      </Text>
+      <Stack gap={0}>
+        {listings.map((l, i) => {
+          const bg = l.identityHue != null
+            ? `linear-gradient(135deg, oklch(0.76 0.11 ${l.identityHue}), oklch(0.5 0.13 ${l.identityHue}))`
+            : 'var(--mantine-color-ocean-3)';
+          return (
+            <Group key={l.id} gap="xs" py={8} wrap="nowrap"
+              style={i > 0 ? { borderTop: '1px solid var(--mantine-color-default-border)' } : undefined}>
+              <Box style={{ width: 26, height: 26, borderRadius: 5, flexShrink: 0, background: bg }} />
+              <Stack gap={0} style={{ flex: 1, minWidth: 0 }}>
+                <Text size="sm" fw={600} truncate>{l.coralName}</Text>
+                <Text size="xs" c="dimmed">{l.qty != null ? `${l.qty} available` : 'qty TBD'}</Text>
+              </Stack>
+              {l.price != null && <Text size="sm" fw={600}>${l.price}</Text>}
+            </Group>
+          );
+        })}
+      </Stack>
+    </Paper>
+  );
+}
+
 type Category = 'SPS' | 'LPS' | 'SOFTIE' | 'ZOA' | 'ANEMONE' | 'OTHER';
 
 const TAB_CATEGORIES: Array<{ value: string; label: string; category?: Category }> = [
-  { value: 'all',     label: 'All' },
-  { value: 'sps',     label: 'SPS',     category: 'SPS' },
-  { value: 'lps',     label: 'LPS',     category: 'LPS' },
-  { value: 'zoa',     label: 'Zoa',     category: 'ZOA' },
-  { value: 'other',   label: 'Other' },
+  { value: 'all',   label: 'All' },
+  { value: 'sps',   label: 'SPS',  category: 'SPS' },
+  { value: 'lps',   label: 'LPS',  category: 'LPS' },
+  { value: 'zoa',   label: 'Zoa',  category: 'ZOA' },
+  { value: 'other', label: 'Other' },
 ];
 
 interface CollectionClientProps {
   specimens: SpecimenRow[];
+  stats: DashboardStats;
+  listings: MyListing[];
+  firstName: string;
 }
 
-export function CollectionClient({ specimens }: CollectionClientProps) {
+export function CollectionClient({ specimens, stats, listings, firstName }: CollectionClientProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [, startTransition] = useTransition();
   const router = useRouter();
 
-  async function handleCreate(values: { name: string; species?: string; category: string; origin?: string; notes?: string; photoUrl?: string; photoKey?: string }) {
+  async function handleCreate(values: {
+    name: string; species?: string; category: string;
+    origin?: string; notes?: string; photoUrl?: string; photoKey?: string;
+  }) {
     await createSpecimen(values);
     setDrawerOpen(false);
     startTransition(() => router.refresh());
@@ -110,20 +177,19 @@ export function CollectionClient({ specimens }: CollectionClientProps) {
   const GRID = { base: 2, sm: 3, md: 4 } as const;
 
   return (
-    <Box p="lg" maw={1200}>
+    <Box p={{ base: 'sm', md: 'lg' }} maw={1200}>
       <AddSpecimenDrawer
         opened={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onSubmit={handleCreate}
       />
 
+      {/* Header */}
       <Group justify="space-between" align="flex-start" mb="md">
         <div>
-          <Text
-            component="h1"
-            style={{ fontSize: 22, fontFamily: 'var(--font-sora)', fontWeight: 700, margin: 0 }}
-          >
-            My Collection
+          <Text component="h1"
+            style={{ fontSize: 22, fontFamily: 'var(--font-sora)', fontWeight: 700, margin: 0 }}>
+            {firstName}&apos;s collection
           </Text>
           <Text size="sm" c="dimmed" mt={2}>
             {specimens.length} specimen{specimens.length !== 1 ? 's' : ''}
@@ -134,7 +200,17 @@ export function CollectionClient({ specimens }: CollectionClientProps) {
         </Button>
       </Group>
 
-      <Group gap="sm" mb="lg" wrap="nowrap">
+      {/* KPIs */}
+      <KpiRow stats={stats} />
+
+      {/* Top utility row: claim + listings */}
+      <div className={styles.topRow}>
+        <ClaimWidget />
+        <ListingsPanel listings={listings} />
+      </div>
+
+      {/* Search */}
+      <Group gap="sm" mb="md" wrap="nowrap">
         <TextInput
           placeholder="Search specimens…"
           leftSection={<IconSearch size={14} />}
@@ -144,18 +220,14 @@ export function CollectionClient({ specimens }: CollectionClientProps) {
         />
       </Group>
 
-      <Tabs defaultValue="all" mb="md">
+      {/* Tabs + grid */}
+      <Tabs defaultValue="all">
         <Tabs.List>
           {TAB_CATEGORIES.map((t) => {
-            const count = t.value === 'all'
-              ? filtered.length
-              : tabSpecimens(t.value).length;
+            const count = t.value === 'all' ? filtered.length : tabSpecimens(t.value).length;
             return (
-              <Tabs.Tab
-                key={t.value}
-                value={t.value}
-                rightSection={<Badge size="xs" variant="light">{count}</Badge>}
-              >
+              <Tabs.Tab key={t.value} value={t.value}
+                rightSection={<Badge size="xs" variant="light">{count}</Badge>}>
                 {t.label}
               </Tabs.Tab>
             );

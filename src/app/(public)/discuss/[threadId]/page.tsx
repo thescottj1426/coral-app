@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { headers } from 'next/headers';
 import { Box, Group, Stack, Text, Paper, Badge } from '@mantine/core';
-import { IconChevronLeft, IconHeart, IconMessageCircle, IconEye } from '@tabler/icons-react';
+import { IconChevronLeft, IconMessageCircle } from '@tabler/icons-react';
 import styles from '@/components/discussion/discussion.module.css';
 import { getThread } from '@/app/actions/discussions';
 import { auth } from '@/lib/auth';
@@ -131,16 +131,8 @@ export default async function PublicThreadPage({ params }: Props) {
 
             <Group gap={16} mt={14} style={{ fontSize: 12, fontWeight: 600, color: 'var(--mantine-color-dimmed)' }}>
               <Group gap={5}>
-                <IconHeart size={14} />
-                <span>0</span>
-              </Group>
-              <Group gap={5}>
                 <IconMessageCircle size={14} />
                 <span>{thread.replyCount} {thread.replyCount === 1 ? 'reply' : 'replies'}</span>
-              </Group>
-              <Group gap={5}>
-                <IconEye size={14} />
-                <span>Watching</span>
               </Group>
             </Group>
           </Paper>

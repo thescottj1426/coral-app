@@ -3,8 +3,9 @@
 import {
   Modal,
   Stack,
-  TextInput,
+  Autocomplete,
   Textarea,
+  TextInput,
   Select,
   SegmentedControl,
   Button,
@@ -19,13 +20,17 @@ import { useState, useEffect } from 'react';
 import { z } from 'zod';
 import { updateSpecimen } from '@/app/actions/specimens';
 import type { SpecimenDetail } from '@/app/actions/specimens';
+import { CORAL_SPECIES, CORAL_COMMON_NAMES } from '@/lib/coralSpecies';
 
 const schema = z.object({
-  name:     z.string().min(1, 'Name is required'),
-  species:  z.string().optional(),
-  category: z.enum(['SPS', 'LPS', 'SOFTIE', 'ZOA', 'ANEMONE']),
-  origin:   z.string().optional(),
-  notes:    z.string().optional(),
+  name:      z.string().min(1, 'Name is required'),
+  species:   z.string().optional(),
+  category:  z.enum(['SPS', 'LPS', 'SOFTIE', 'ZOA', 'ANEMONE', 'OTHER']),
+  origin:    z.string().min(1, 'Origin is required'),
+  notes:     z.string().optional(),
+  tankName:  z.string().optional(),
+  lightPar:  z.string().optional(),
+  flowLevel: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -52,22 +57,28 @@ export function EditSpecimenModal({ opened, onClose, specimen }: EditSpecimenMod
   const form = useForm<FormValues>({
     validate: schemaResolver(schema),
     initialValues: {
-      name:     specimen.name,
-      species:  specimen.species ?? '',
-      category: (specimen.category as FormValues['category']) ?? 'SPS',
-      origin:   specimen.origin ?? '',
-      notes:    specimen.notes ?? '',
+      name:      specimen.name,
+      species:   specimen.species ?? '',
+      category:  (specimen.category as FormValues['category']) ?? 'SPS',
+      origin:    specimen.origin ?? '',
+      notes:     specimen.notes ?? '',
+      tankName:  specimen.tankName ?? '',
+      lightPar:  specimen.lightPar ?? '',
+      flowLevel: specimen.flowLevel ?? '',
     },
   });
 
   useEffect(() => {
     if (opened) {
       form.setValues({
-        name:     specimen.name,
-        species:  specimen.species ?? '',
-        category: (specimen.category as FormValues['category']) ?? 'SPS',
-        origin:   specimen.origin ?? '',
-        notes:    specimen.notes ?? '',
+        name:      specimen.name,
+        species:   specimen.species ?? '',
+        category:  (specimen.category as FormValues['category']) ?? 'SPS',
+        origin:    specimen.origin ?? '',
+        notes:     specimen.notes ?? '',
+        tankName:  specimen.tankName ?? '',
+        lightPar:  specimen.lightPar ?? '',
+        flowLevel: specimen.flowLevel ?? '',
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -118,16 +129,20 @@ export function EditSpecimenModal({ opened, onClose, specimen }: EditSpecimenMod
           <div>
             <Text style={{ ...EYEBROW, marginBottom: 10 }}>identity</Text>
             <Stack gap="sm">
-              <TextInput
+              <Autocomplete
                 label="Common name"
                 placeholder="e.g. Oregon Tort"
                 withAsterisk
+                data={CORAL_COMMON_NAMES}
+                limit={10}
                 {...form.getInputProps('name')}
               />
-              <TextInput
+              <Autocomplete
                 label="Species"
                 placeholder="e.g. Acropora tortuosa"
                 styles={{ input: { fontStyle: 'italic' } }}
+                data={CORAL_SPECIES}
+                limit={8}
                 {...form.getInputProps('species')}
               />
             </Stack>
@@ -143,6 +158,7 @@ export function EditSpecimenModal({ opened, onClose, specimen }: EditSpecimenMod
                 { value: 'SOFTIE',  label: 'Softie' },
                 { value: 'ZOA',     label: 'Zoa' },
                 { value: 'ANEMONE', label: 'Anemone' },
+                { value: 'OTHER',   label: 'Other' },
               ]}
               {...form.getInputProps('category')}
             />
@@ -154,8 +170,8 @@ export function EditSpecimenModal({ opened, onClose, specimen }: EditSpecimenMod
             <Text style={{ ...EYEBROW, marginBottom: 10 }}>provenance</Text>
             <Select
               label="Origin"
+              withAsterisk
               data={['Aquacultured', 'Maricultured', 'Wild-caught', 'Tank-bred']}
-              clearable
               {...form.getInputProps('origin')}
             />
           </div>
@@ -171,6 +187,29 @@ export function EditSpecimenModal({ opened, onClose, specimen }: EditSpecimenMod
               maxRows={6}
               {...form.getInputProps('notes')}
             />
+          </div>
+
+          <Divider />
+
+          <div>
+            <Text style={{ ...EYEBROW, marginBottom: 10 }}>tank &amp; husbandry</Text>
+            <Stack gap="sm">
+              <TextInput
+                label="Tank / system"
+                placeholder="e.g. Main display"
+                {...form.getInputProps('tankName')}
+              />
+              <TextInput
+                label="Light (PAR / intensity)"
+                placeholder="e.g. 180 PAR, medium-high"
+                {...form.getInputProps('lightPar')}
+              />
+              <TextInput
+                label="Flow level"
+                placeholder="e.g. Medium-high"
+                {...form.getInputProps('flowLevel')}
+              />
+            </Stack>
           </div>
 
           <Group gap="sm" pt={4}>

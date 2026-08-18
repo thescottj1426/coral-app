@@ -1,20 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
-  ActionIcon,
   Avatar,
-  Burger,
   Group,
   Menu,
-  Button,
   Text,
 } from '@mantine/core';
 import {
   IconSeeding,
   IconSearch,
-  IconBell,
   IconUser,
   IconLogout,
   IconMoon,
@@ -24,14 +20,18 @@ import { useMantineColorScheme } from '@mantine/core';
 import { signOut, useSession } from '@/lib/auth-client';
 import { useEffect, useState } from 'react';
 import { coralIdentityGradient } from '@/theme/theme';
+import { NotificationBell } from './NotificationBell';
 import styles from './shell.module.css';
 
-interface AppHeaderProps {
-  mobileNavOpen: boolean;
-  onBurger: () => void;
-}
+const NAV_TABS = [
+  { label: 'Collect',  href: '/collection' },
+  { label: 'Explore',  href: '/explore' },
+  { label: 'Discuss',  href: '/discuss' },
+  { label: 'Feed',     href: '/feed' },
+];
 
-export function AppHeader({ mobileNavOpen, onBurger }: AppHeaderProps) {
+export function AppHeader() {
+  const pathname = usePathname();
   const router = useRouter();
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
   const { data: session, isPending } = useSession();
@@ -43,21 +43,31 @@ export function AppHeader({ mobileNavOpen, onBurger }: AppHeaderProps) {
     fetch('/api/me').then((r) => r.json()).then((d) => setProfileUsername(d.username ?? null));
   }, [session?.user?.id]);
 
+  function isActive(href: string) {
+    if (href === '/collection') return pathname.startsWith('/collection');
+    return pathname === href || pathname.startsWith(href + '/');
+  }
+
   return (
     <div className={styles.header}>
-      <Burger
-        opened={mobileNavOpen}
-        onClick={onBurger}
-        size="sm"
-        hiddenFrom="md"
-      />
-
       <Link href="/" className={styles.logo}>
         <span className={styles.logoMark}>
           <IconSeeding size={13} stroke={2.2} color="#fff" />
         </span>
         Coral Chest
       </Link>
+
+      <nav className={styles.tabNav}>
+        {NAV_TABS.map(({ label, href }) => (
+          <Link
+            key={href}
+            href={href}
+            className={`${styles.tabLink} ${isActive(href) ? styles.tabLinkActive : ''}`}
+          >
+            {label}
+          </Link>
+        ))}
+      </nav>
 
       <form
         className={styles.searchButton}
@@ -81,23 +91,7 @@ export function AppHeader({ mobileNavOpen, onBurger }: AppHeaderProps) {
       </form>
 
       <div className={styles.headerRight}>
-        <div className={styles.headerCollectionBtn}>
-          <Button
-            variant="light"
-            size="xs"
-            component={Link}
-            href="/collection"
-          >
-            My Collection
-          </Button>
-        </div>
-
-        <div className={styles.headerBell}>
-          <ActionIcon variant="default" size="md" aria-label="Notifications">
-            <IconBell size={16} stroke={1.7} />
-          </ActionIcon>
-        </div>
-
+        {session?.user && <NotificationBell />}
         <Menu shadow="md" width={180} position="bottom-end">
           <Menu.Target>
             <Avatar

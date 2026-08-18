@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, Suspense, useTransition } from 'react';
+import { useState, Suspense, useTransition, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { track } from '@vercel/analytics';
 import {
   Box,
   Text,
@@ -161,6 +162,11 @@ function ClaimContent() {
 
   const normalized = code.toUpperCase().trim();
 
+  useEffect(() => {
+    if (searchParams.get('code')) handleLookup();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function handleLookup() {
     if (!normalized) return;
     setLookupError(null);
@@ -184,6 +190,7 @@ function ClaimContent() {
       if ('error' in result) {
         setClaimError(result.error);
       } else {
+        track('frag_claimed');
         router.push(`/collection/${result.coralRfCode}`);
       }
     });

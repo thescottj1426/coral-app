@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import {
   IconGitBranch, IconHexagon, IconMapPin, IconTag, IconTrendingUp, IconPhoto, IconPin,
 } from '@tabler/icons-react';
+import { track } from '@vercel/analytics';
 import { createThread } from '@/app/actions/discussions';
 import { AnchorCard } from './AnchorCard';
 import { THREAD_TYPES } from './TypeBadge';
@@ -66,6 +67,7 @@ export function ThreadComposer({
           body: body.trim() || null,
           type,
         });
+        track('thread_posted');
         notifications.show({ message: 'Thread started', color: 'teal' });
         handleClose();
         router.push(`/collection/${specimenRfCode ?? specimenId}/discussion/${thread.id}`);

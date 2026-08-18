@@ -3,6 +3,8 @@
 import {
   TextInput,
   PasswordInput,
+  Checkbox,
+  Anchor,
   Button,
   Divider,
   Title,
@@ -13,6 +15,7 @@ import { z } from 'zod';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { track } from '@vercel/analytics';
 import { signUp, authClient } from '@/lib/auth-client';
 import styles from './auth.module.css';
 
@@ -28,6 +31,7 @@ const schema = z.object({
   password: z
     .string()
     .min(8, { message: 'Password must be at least 8 characters' }),
+  termsAccepted: z.boolean().refine(val => val === true, { message: 'You must accept the Terms of Service to continue' }),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -43,6 +47,7 @@ export function SignUpForm() {
       email: '',
       username: '',
       password: '',
+      termsAccepted: false,
     },
   });
 
@@ -59,6 +64,7 @@ export function SignUpForm() {
       if (result.error) {
         setError(result.error.message ?? 'Something went wrong');
       } else {
+        track('signup_completed');
         router.push('/verify-notice');
         router.refresh();
       }
@@ -102,6 +108,18 @@ export function SignUpForm() {
           {...form.getInputProps('password')}
         />
 
+        <Checkbox
+          label={
+            <Text size="sm">
+              I agree to the{' '}
+              <Anchor component={Link} href="/terms" target="_blank" c="ocean.6">Terms of Service</Anchor>
+              {' '}and{' '}
+              <Anchor component={Link} href="/privacy" target="_blank" c="ocean.6">Privacy Policy</Anchor>
+            </Text>
+          }
+          {...form.getInputProps('termsAccepted', { type: 'checkbox' })}
+        />
+
         <Button type="submit" fullWidth mt={4} loading={loading}>
           Create account
         </Button>
@@ -115,6 +133,13 @@ export function SignUpForm() {
         >
           Continue with Google
         </Button>
+
+        <Text size="xs" c="dimmed" ta="center">
+          By continuing, you agree to our{' '}
+          <Anchor component={Link} href="/terms" size="xs" c="ocean.6">Terms</Anchor>
+          {' '}and{' '}
+          <Anchor component={Link} href="/privacy" size="xs" c="ocean.6">Privacy Policy</Anchor>
+        </Text>
 
         <Divider label="already collecting?" labelPosition="center" />
 

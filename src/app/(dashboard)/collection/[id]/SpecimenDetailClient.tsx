@@ -1,26 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { notifications } from '@mantine/notifications';
 import {
   Group,
-  Stack,
-  Text,
-  Badge,
   Button,
-  Paper,
-  Divider,
-  Anchor,
-  ThemeIcon,
+  Badge,
 } from '@mantine/core';
 import {
   IconShare,
   IconLeaf,
   IconEdit,
   IconTrash,
-  IconShield,
   IconScissors,
   IconTag,
+  IconCamera,
 } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useDisclosure } from '@mantine/hooks';
@@ -29,9 +23,8 @@ import Image from 'next/image';
 import { FragModal } from '@/components/specimen/FragModal';
 import { EditSpecimenModal } from '@/components/specimen/EditSpecimenModal';
 import { ListFragModal } from '@/components/specimen/ListFragModal';
-import { SpecimenThumb } from '@/components/specimen/SpecimenThumb';
 import { PhotoLightbox } from '@/components/specimen/PhotoLightbox';
-import { deleteSpecimen } from '@/app/actions/specimens';
+import { deleteSpecimen, addSpecimenPhoto } from '@/app/actions/specimens';
 import type { SpecimenDetail } from '@/app/actions/specimens';
 
 interface Props {
@@ -39,60 +32,6 @@ interface Props {
   isOwner?: boolean;
 }
 
-export function SpecimenActions({ specimen }: Props) {
-  const router = useRouter();
-  const [fragOpened, { open: openFrag, close: closeFrag }] = useDisclosure(false);
-  const myGeneration = 0;
-
-  async function handleDelete() {
-    if (!confirm(`Delete "${specimen.name}"? This cannot be undone.`)) return;
-    await deleteSpecimen(specimen.id);
-    router.push('/collection');
-  }
-
-  return (
-    <>
-      <FragModal
-        opened={fragOpened}
-        onClose={closeFrag}
-        parentId={specimen.id}
-        parentRfCode={specimen.rfCode ?? specimen.id}
-        parentName={specimen.name}
-        parentGeneration={myGeneration}
-      />
-
-      <Group gap="xs">
-        <Button size="xs" variant="white" leftSection={<IconEdit size={12} />}>
-          Edit
-        </Button>
-        <Button size="xs" variant="white" leftSection={<IconShare size={12} />}>
-          Share
-        </Button>
-      </Group>
-
-      <Group gap="xs" ml="auto" style={{ display: 'none' }}>
-        <Button
-          variant="light"
-          color="teal"
-          size="xs"
-          leftSection={<IconScissors size={12} />}
-          onClick={openFrag}
-        >
-          Frag this specimen
-        </Button>
-        <Button
-          component={Link}
-          href={`/collection/${specimen.rfCode ?? specimen.id}/pedigree`}
-          variant="light"
-          size="xs"
-          leftSection={<IconLeaf size={12} />}
-        >
-          Pedigree
-        </Button>
-      </Group>
-    </>
-  );
-}
 
 export function MetaStripActions({ specimen, isOwner }: Props) {
   const router = useRouter();
@@ -192,47 +131,56 @@ export function HeroActions({ specimen, isOwner }: Props) {
   );
 }
 
-export function LineageSidebar({ specimen }: Props) {
-  const EYEBROW: React.CSSProperties = {
-    fontFamily: 'var(--font-ibm-plex-mono), monospace',
-    fontSize: 10,
-    textTransform: 'uppercase',
-    letterSpacing: '0.1em',
-    color: 'var(--mantine-color-dimmed)',
-    fontWeight: 500,
-  };
+
+export function AddPhotoButton({ specimenId }: { specimenId: string }) {
+  const router = useRouter();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      notifications.show({ title: 'File too large', message: 'Max 8 MB', color: 'red' });
+      return;
+    }
+    setLoading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/upload', { method: 'POST', body: fd });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Upload failed');
+      const { key, url } = await res.json();
+      await addSpecimenPhoto({ specimenId, photoKey: key, photoUrl: url });
+      notifications.show({ message: 'Photo added — pending review', color: 'teal' });
+      router.refresh();
+    } catch (err) {
+      notifications.show({ title: 'Upload failed', message: err instanceof Error ? err.message : 'Please try again.', color: 'red' });
+    } finally {
+      setLoading(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  }
 
   return (
-    <Paper withBorder p="md">
-      <Group gap={6} mb={12}>
-        <IconShield size={12} color="var(--mantine-color-ocean-6)" />
-        <Text style={EYEBROW}>collector</Text>
-      </Group>
-      <Stack gap={6}>
-        <Group gap={8} wrap="nowrap">
-          <SpecimenThumb rfCode={specimen.rfCode ?? specimen.id} size={24} radius={4} />
-          <Stack gap={0} style={{ flex: 1, minWidth: 0 }}>
-            <Text size="xs" fw={600} truncate>
-              {specimen.ownerDisplayName ?? specimen.ownerUsername}
-            </Text>
-            <Text style={{ ...EYEBROW, fontSize: 9 }}>
-              @{specimen.ownerUsername}
-            </Text>
-          </Stack>
-          <Badge size="xs" variant="light" color="ocean" radius="xl">Owner</Badge>
-        </Group>
-      </Stack>
-      <Divider my="sm" />
-      <Anchor
-        component={Link}
-        href={`/u/${specimen.ownerUsername}`}
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/heic"
+        style={{ display: 'none' }}
+        onChange={handleFile}
+      />
+      <Button
         size="xs"
-        fw={600}
-        style={{ display: 'block', textAlign: 'center' }}
+        variant="default"
+        leftSection={<IconCamera size={13} />}
+        loading={loading}
+        onClick={() => inputRef.current?.click()}
       >
-        View full collection →
-      </Anchor>
-    </Paper>
+        Add photo
+      </Button>
+    </>
   );
 }
 

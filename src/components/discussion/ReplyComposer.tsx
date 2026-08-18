@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { notifications } from '@mantine/notifications';
 import { IconSend } from '@tabler/icons-react';
+import { track } from '@vercel/analytics';
 import { createReply } from '@/app/actions/discussions';
 import { coralIdentityGradient } from '@/theme/theme';
 
@@ -22,6 +23,7 @@ export function ReplyComposer({ threadId, specimenId, authorUsername }: Props) {
     startTransition(async () => {
       try {
         await createReply({ threadId, specimenId, body: body.trim() });
+        track('reply_posted');
         setBody('');
         notifications.show({ message: 'Reply posted', color: 'teal' });
       } catch {

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { Sora, IBM_Plex_Mono } from 'next/font/google';
+import { Sora, IBM_Plex_Mono, Instrument_Sans } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/next';
 import { Providers } from './providers';
 import './globals.css';
 
@@ -17,6 +18,13 @@ const ibmPlexMono = IBM_Plex_Mono({
   display: 'swap',
 });
 
+const instrumentSans = Instrument_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-instrument-sans',
+  display: 'swap',
+});
+
 export const metadata: Metadata = {
   title: 'Coral Chest',
   description: 'The collector\'s log for reef hobbyists. Log specimens, trace lineage, share your chest.',
@@ -30,11 +38,12 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${sora.variable} ${ibmPlexMono.variable}`}
+      className={`${sora.variable} ${ibmPlexMono.variable} ${instrumentSans.variable}`}
       suppressHydrationWarning
     >
       <body suppressHydrationWarning>
         <Providers>{children}</Providers>
+        <Analytics />
       </body>
     </html>
   );

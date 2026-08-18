@@ -26,7 +26,7 @@ export function FirstCoralForm() {
   const [name, setName] = useState('');
   const [category, setCategory] = useState('SPS');
   const [species, setSpecies] = useState('');
-  const [origin, setOrigin] = useState('');
+  const [origin, setOrigin] = useState('Aquacultured');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -36,7 +36,7 @@ export function FirstCoralForm() {
     setLoading(true);
     setError('');
     try {
-      await createSpecimen({ name: name.trim(), category, species: species.trim() || undefined, origin: origin.trim() || undefined });
+      await createSpecimen({ name: name.trim(), category, species: species.trim() || undefined, origin: origin.trim() });
       router.push('/dashboard');
     } catch {
       setError('Something went wrong. Try again.');
@@ -83,10 +83,11 @@ export function FirstCoralForm() {
           />
 
           <TextInput
-            label={<><Text span>Origin</Text> <Text span c="dimmed" fw={400}>(optional)</Text></>}
+            label="Origin"
             placeholder="e.g. Indo, aquacultured, local frag swap"
             value={origin}
             onChange={(e) => setOrigin(e.currentTarget.value)}
+            required
           />
         </Stack>
 

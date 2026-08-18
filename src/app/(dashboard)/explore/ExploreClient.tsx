@@ -69,7 +69,7 @@ function CollectorCard({ c }: { c: ExploreCollector }) {
   return (
     <Paper
       component={Link}
-      href={`/u/${c.username}`}
+      href={`/users/${c.username}`}
       withBorder
       p="md"
       style={{ minWidth: 160, flexShrink: 0, textDecoration: 'none', display: 'block' }}

@@ -1,32 +1,11 @@
 'use server';
 
-import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
-import { auth } from '@/lib/auth';
 import { pool } from '@/lib/db';
+import { getCurrentUser } from '@/lib/getCurrentUser';
 import { sendEmail } from '@/lib/email';
 import { welcomeTemplate } from '@/lib/emailTemplates';
-
-async function getCurrentUser() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user) throw new Error('Not authenticated');
-  return session.user;
-}
-
-function generateRFCode(): string {
-  // Avoids ambiguous chars (0/O, 1/I/L)
-  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-  return 'RF-' + Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-}
-
-async function uniqueRFCode(): Promise<string> {
-  for (let i = 0; i < 10; i++) {
-    const code = generateRFCode();
-    const { rows } = await pool.query('SELECT 1 FROM public."Coral" WHERE "rfCode" = $1', [code]);
-    if (rows.length === 0) return code;
-  }
-  throw new Error('Could not generate a unique RF code after 10 attempts');
-}
+import { uniqueRFCode } from '@/lib/rfCode';
 
 export type SpecimenRow = {
   id: string;
@@ -39,16 +18,23 @@ export type SpecimenRow = {
   identityHue: number | null;
   acquiredDate: string | null;
   createdAt: string;
+  updatedAt: string;
+  tankName: string | null;
+  lightPar: string | null;
+  flowLevel: string | null;
   coverPhotoUrl: string | null;
+  coverPhotoPending: boolean | null;
 };
 
-export async function getMySpecimens(): Promise<SpecimenRow[]> {
-  const user = await getCurrentUser();
+export async function getMySpecimens(userId?: string): Promise<SpecimenRow[]> {
+  const user = userId ? { id: userId } : await getCurrentUser();
   const { rows } = await pool.query<SpecimenRow>(
     `SELECT
        c.id, c.name, c.species, c.category, c."rfCode", c.origin, c.notes,
-       c."identityHue", c."acquiredDate", c."createdAt",
-       (SELECT '/api/image?key=' || p."s3Key" FROM public."CoralPhoto" p WHERE p."coralId" = c.id AND p.status = 'approved' ORDER BY p."createdAt" ASC LIMIT 1) AS "coverPhotoUrl"
+       c."identityHue", c."acquiredDate", c."createdAt", c."updatedAt",
+       c."tankName", c."lightPar", c."flowLevel",
+       (SELECT '/api/image?key=' || p."s3Key" FROM public."CoralPhoto" p WHERE p."coralId" = c.id ORDER BY CASE WHEN p.status = 'approved' THEN 0 ELSE 1 END, p."createdAt" ASC LIMIT 1) AS "coverPhotoUrl",
+       (SELECT p.status = 'pending' FROM public."CoralPhoto" p WHERE p."coralId" = c.id ORDER BY CASE WHEN p.status = 'approved' THEN 0 ELSE 1 END, p."createdAt" ASC LIMIT 1) AS "coverPhotoPending"
      FROM public."Coral" c
      WHERE c."ownerId" = $1
      ORDER BY c."createdAt" DESC`,
@@ -63,6 +49,9 @@ export async function createSpecimen(data: {
   category: string;
   origin?: string;
   notes?: string;
+  tankName?: string;
+  lightPar?: string;
+  flowLevel?: string;
   photoUrl?: string;
   photoKey?: string;
 }): Promise<SpecimenRow> {
@@ -72,19 +61,23 @@ export async function createSpecimen(data: {
 
   const { rows } = await pool.query<SpecimenRow>(
     `INSERT INTO public."Coral"
-       (id, name, species, category, origin, notes, "rfCode", "ownerId", "identityHue", "updatedAt")
+       (id, name, species, category, origin, notes, "tankName", "lightPar", "flowLevel", "rfCode", "ownerId", "identityHue", "updatedAt")
      VALUES
-       (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, NOW())
-     RETURNING id, name, species, category, "rfCode", origin, notes, "identityHue", "acquiredDate", "createdAt"`,
-    [data.name, data.species ?? null, data.category, data.origin ?? null, data.notes ?? null, rfCode, user.id, identityHue]
+       (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+     RETURNING id, name, species, category, "rfCode", origin, notes, "tankName", "lightPar", "flowLevel", "identityHue", "acquiredDate", "createdAt", "updatedAt"`,
+    [
+      data.name, data.species ?? null, data.category, data.origin ?? null, data.notes ?? null,
+      data.tankName ?? null, data.lightPar ?? null, data.flowLevel ?? null,
+      rfCode, user.id, identityHue,
+    ]
   );
 
   const specimen = rows[0];
 
   if (data.photoUrl && data.photoKey) {
     await pool.query(
-      `INSERT INTO public."CoralPhoto" (id, "s3Key", url, "coralId", "createdAt")
-       VALUES (gen_random_uuid()::text, $1, $2, $3, NOW())`,
+      `INSERT INTO public."CoralPhoto" (id, "s3Key", url, "coralId", status, "createdAt")
+       VALUES (gen_random_uuid()::text, $1, $2, $3, 'pending', NOW())`,
       [data.photoKey, data.photoUrl, specimen.id]
     );
   }
@@ -97,10 +90,33 @@ export async function createSpecimen(data: {
     [user.id]
   );
   if (parseInt(countRows[0].count, 10) === 1) {
-    sendEmail(user.email, 'Your collection has started 🪸', welcomeTemplate(user.name ?? user.email)).catch(() => {});
+    sendEmail(user.email, 'Your collection has started 🪸', welcomeTemplate(user.name ?? user.email))
+      .catch((err) => console.error('[specimens] welcome email failed:', err));
   }
 
   return specimen;
+}
+
+export async function addSpecimenPhoto(data: {
+  specimenId: string;
+  photoKey: string;
+  photoUrl: string;
+}): Promise<void> {
+  const user = await getCurrentUser();
+
+  const { rows } = await pool.query<{ ownerId: string }>(
+    `SELECT "ownerId" FROM public."Coral" WHERE id = $1`,
+    [data.specimenId]
+  );
+  if (!rows[0] || rows[0].ownerId !== user.id) throw new Error('Not authorized');
+
+  await pool.query(
+    `INSERT INTO public."CoralPhoto" (id, "s3Key", url, "coralId", status, "createdAt")
+     VALUES (gen_random_uuid()::text, $1, $2, $3, 'pending', NOW())`,
+    [data.photoKey, data.photoUrl, data.specimenId]
+  );
+
+  revalidatePath(`/collection/${data.specimenId}`);
 }
 
 export type SpecimenDetail = SpecimenRow & {
@@ -108,22 +124,28 @@ export type SpecimenDetail = SpecimenRow & {
   ownerUsername: string;
   ownerDisplayName: string | null;
   isOwner: boolean;
-  photos: Array<{ id: string; url: string; s3Key: string; status: string }>;
+  fragsGiven: number;
+  generationsBack: number;
+  photoCount: number;
+  threadCount: number;
+  photos: Array<{ id: string; url: string; s3Key: string; status: string; createdAt: string }>;
 };
 
 export async function getPublicSpecimen(rfCodeOrId: string): Promise<SpecimenDetail | null> {
   const { rows } = await pool.query<SpecimenDetail>(
     `SELECT
        c.id, c.name, c.species, c.category, c."rfCode", c.origin, c.notes,
-       c."identityHue", c."acquiredDate", c."createdAt",
+       c."identityHue", c."acquiredDate", c."createdAt", c."updatedAt",
+       c."tankName", c."lightPar", c."flowLevel",
        c."ownerId",
        u.username AS "ownerUsername",
        u."displayName" AS "ownerDisplayName",
        false AS "isOwner",
        NULL AS "coverPhotoUrl",
+       0 AS "fragsGiven", 0 AS "generationsBack", 0 AS "photoCount", 0 AS "threadCount",
        COALESCE(
          json_agg(
-           json_build_object('id', p.id, 'url', '/api/image?key=' || p."s3Key", 's3Key', p."s3Key", 'status', p.status)
+           json_build_object('id', p.id, 'url', '/api/image?key=' || p."s3Key", 's3Key', p."s3Key", 'status', p.status, 'createdAt', p."createdAt")
            ORDER BY p."createdAt" ASC
          ) FILTER (WHERE p.id IS NOT NULL AND p.status = 'approved'),
          '[]'
@@ -140,21 +162,30 @@ export async function getPublicSpecimen(rfCodeOrId: string): Promise<SpecimenDet
 }
 
 export async function getSpecimen(rfCodeOrId: string): Promise<SpecimenDetail | null> {
-  const session = await auth.api.getSession({ headers: await headers() }).catch(() => null);
-  const viewerId = session?.user?.id ?? null;
+  let viewerId: string | null = null;
+  try { viewerId = (await getCurrentUser()).id; } catch {}
 
   const { rows } = await pool.query<SpecimenDetail>(
     `SELECT
        c.id, c.name, c.species, c.category, c."rfCode", c.origin, c.notes,
-       c."identityHue", c."acquiredDate", c."createdAt",
+       c."identityHue", c."acquiredDate", c."createdAt", c."updatedAt",
+       c."tankName", c."lightPar", c."flowLevel",
        c."ownerId",
        u.username AS "ownerUsername",
        u."displayName" AS "ownerDisplayName",
        (c."ownerId" = $2) AS "isOwner",
        NULL AS "coverPhotoUrl",
+       (SELECT COUNT(*)::int FROM public."Lineage" WHERE "parentId" = c.id) AS "fragsGiven",
+       (WITH RECURSIVE anc AS (
+         SELECT "parentId" FROM public."Lineage" WHERE "childId" = c.id
+         UNION ALL
+         SELECT l."parentId" FROM public."Lineage" l JOIN anc ON l."childId" = anc."parentId"
+       ) SELECT COUNT(*)::int FROM anc) AS "generationsBack",
+       (SELECT COUNT(*)::int FROM public."CoralPhoto" WHERE "coralId" = c.id) AS "photoCount",
+       (SELECT COUNT(*)::int FROM public."Thread" WHERE "anchorType" = 'specimen' AND "anchorId" = c.id::text) AS "threadCount",
        COALESCE(
          json_agg(
-           json_build_object('id', p.id, 'url', '/api/image?key=' || p."s3Key", 's3Key', p."s3Key", 'status', p.status)
+           json_build_object('id', p.id, 'url', '/api/image?key=' || p."s3Key", 's3Key', p."s3Key", 'status', p.status, 'createdAt', p."createdAt")
            ORDER BY p."createdAt" ASC
          ) FILTER (WHERE p.id IS NOT NULL AND (p.status = 'approved' OR c."ownerId" = $2)),
          '[]'
@@ -176,13 +207,21 @@ export async function updateSpecimen(id: string, data: {
   category: string;
   origin?: string;
   notes?: string;
+  tankName?: string;
+  lightPar?: string;
+  flowLevel?: string;
 }): Promise<void> {
   const user = await getCurrentUser();
   await pool.query(
     `UPDATE public."Coral"
-     SET name=$1, species=$2, category=$3::\"CoralCategory\", origin=$4, notes=$5, "updatedAt"=NOW()
-     WHERE id=$6 AND "ownerId"=$7`,
-    [data.name, data.species ?? null, data.category, data.origin ?? null, data.notes ?? null, id, user.id]
+     SET name=$1, species=$2, category=$3::\"CoralCategory\", origin=$4, notes=$5,
+         "tankName"=$6, "lightPar"=$7, "flowLevel"=$8, "updatedAt"=NOW()
+     WHERE id=$9 AND "ownerId"=$10`,
+    [
+      data.name, data.species ?? null, data.category, data.origin ?? null, data.notes ?? null,
+      data.tankName ?? null, data.lightPar ?? null, data.flowLevel ?? null,
+      id, user.id,
+    ]
   );
   revalidatePath('/collection');
   revalidatePath(`/collection/${id}`);
@@ -210,6 +249,15 @@ export async function getMoreByOwner(ownerId: string, excludeId: string, limit =
     [ownerId, excludeId, limit]
   );
   return rows;
+}
+
+export async function searchCoralNames(query: string): Promise<string[]> {
+  if (query.length < 2) return [];
+  const { rows } = await pool.query<{ name: string }>(
+    `SELECT DISTINCT name FROM public."Coral" WHERE name ILIKE $1 ORDER BY name LIMIT 8`,
+    [`${query}%`]
+  );
+  return rows.map(r => r.name);
 }
 
 export async function deleteSpecimen(id: string): Promise<void> {

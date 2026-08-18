@@ -15,8 +15,8 @@ import {
   ScrollArea,
   Loader,
 } from '@mantine/core';
-import { IconCopy, IconCheck, IconLeaf, IconScissors, IconPlus } from '@tabler/icons-react';
-import { useState, useTransition, useEffect } from 'react';
+import { IconCopy, IconCheck, IconLeaf, IconScissors, IconPlus, IconLink } from '@tabler/icons-react';
+import { useState, useTransition } from 'react';
 import { CoralThumb } from './CoralThumb';
 import { createFrags } from '@/app/actions/lineage';
 
@@ -43,18 +43,6 @@ export function FragModal({ opened, onClose, parentId, parentRfCode, parentName,
   const [codes, setCodes] = useState<string[]>([]);
   const [isPending, startTransition] = useTransition();
 
-  useEffect(() => {
-    if (!opened) {
-      setCodes([]);
-      return;
-    }
-    startTransition(async () => {
-      const newCodes = await createFrags(parentId, 1);
-      setCodes(newCodes);
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [opened]);
-
   function addFrag() {
     startTransition(async () => {
       const newCodes = await createFrags(parentId, 1);
@@ -63,6 +51,7 @@ export function FragModal({ opened, onClose, parentId, parentRfCode, parentName,
   }
 
   function handleClose() {
+    setCodes([]);
     onClose();
   }
 
@@ -119,11 +108,18 @@ export function FragModal({ opened, onClose, parentId, parentRfCode, parentName,
             <Text size="xs" c="dimmed">{codes.length} frag{codes.length !== 1 ? 's' : ''} logged</Text>
           </Group>
 
-          {isPending && codes.length === 0 ? (
-            <Group justify="center" py="md">
-              <Loader size="sm" color="teal" />
-              <Text size="xs" c="dimmed">Registering frag code…</Text>
-            </Group>
+          {codes.length === 0 ? (
+            isPending ? (
+              <Group justify="center" py="md">
+                <Loader size="sm" color="teal" />
+                <Text size="xs" c="dimmed">Registering frag code…</Text>
+              </Group>
+            ) : (
+              <Paper p="md" style={{ textAlign: 'center', border: '1px dashed var(--mantine-color-default-border)' }}>
+                <Text size="sm" c="dimmed">No frags logged yet</Text>
+                <Text size="xs" c="dimmed" mt={4}>Click below to generate your first RF code</Text>
+              </Paper>
+            )
           ) : (
             <ScrollArea.Autosize mah={280} offsetScrollbars>
               <Stack gap={6}>
@@ -175,6 +171,20 @@ export function FragModal({ opened, onClose, parentId, parentRfCode, parentName,
                           </ActionIcon>
                         )}
                       </CopyButton>
+                      <CopyButton value={`${typeof window !== 'undefined' ? window.location.origin : ''}/claim?code=${code}`} timeout={2000}>
+                        {({ copied, copy }) => (
+                          <ActionIcon
+                            variant="light"
+                            color={copied ? 'teal' : 'gray'}
+                            size="md"
+                            radius="md"
+                            onClick={copy}
+                            aria-label="Copy claim link"
+                          >
+                            {copied ? <IconCheck size={14} /> : <IconLink size={14} />}
+                          </ActionIcon>
+                        )}
+                      </CopyButton>
                     </Group>
                   </Paper>
                 ))}
@@ -183,7 +193,7 @@ export function FragModal({ opened, onClose, parentId, parentRfCode, parentName,
           )}
         </Stack>
 
-        {/* Add another */}
+        {/* Add frag */}
         <Button
           variant="light"
           leftSection={<IconPlus size={14} />}
@@ -191,7 +201,7 @@ export function FragModal({ opened, onClose, parentId, parentRfCode, parentName,
           loading={isPending}
           fullWidth
         >
-          Log another frag
+          Log a frag
         </Button>
 
         <Divider />
@@ -201,8 +211,8 @@ export function FragModal({ opened, onClose, parentId, parentRfCode, parentName,
           <Text style={{ ...EYEBROW, marginBottom: 6 }}>what happens next</Text>
           <Stack gap={4}>
             {[
-              'Give each friend their frag plug + its RF code',
-              'They enter it in the Claim widget on their dashboard',
+              'Give each friend their frag plug + RF code, or copy the claim link',
+              'They visit the link or enter the code at /claim',
               'Their name joins the lineage — permanently',
             ].map((step, i) => (
               <Group key={i} gap={8} wrap="nowrap" align="flex-start">

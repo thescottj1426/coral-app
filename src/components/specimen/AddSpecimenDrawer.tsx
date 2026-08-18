@@ -3,8 +3,9 @@
 import {
   Drawer,
   Stack,
-  TextInput,
+  Autocomplete,
   Textarea,
+  TextInput,
   Select,
   SegmentedControl,
   Button,
@@ -15,19 +16,23 @@ import {
   Image,
   CloseButton,
 } from '@mantine/core';
-import { Dropzone, IMAGE_MIME_TYPE } from '@mantine/dropzone';
 import { useForm, schemaResolver } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { IconPhoto, IconUpload, IconX } from '@tabler/icons-react';
+import { IconPhoto } from '@tabler/icons-react';
 import { useState } from 'react';
+import { track } from '@vercel/analytics';
 import { z } from 'zod';
+import { CORAL_SPECIES, CORAL_COMMON_NAMES } from '@/lib/coralSpecies';
 
 const schema = z.object({
-  name:     z.string().min(1, 'Name is required'),
-  species:  z.string().optional(),
-  category: z.enum(['SPS', 'LPS', 'SOFTIE', 'ZOA', 'ANEMONE']),
-  origin:   z.string().min(1, 'Origin is required'),
-  notes:    z.string().optional(),
+  name:      z.string().min(1, 'Name is required'),
+  species:   z.string().optional(),
+  category:  z.enum(['SPS', 'LPS', 'SOFTIE', 'ZOA', 'ANEMONE', 'OTHER']),
+  origin:    z.string().min(1, 'Origin is required'),
+  notes:     z.string().optional(),
+  tankName:  z.string().optional(),
+  lightPar:  z.string().optional(),
+  flowLevel: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -51,23 +56,30 @@ export function AddSpecimenDrawer({ opened, onClose, onSubmit }: AddSpecimenDraw
   const [loading, setLoading] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
-
   const form = useForm<FormValues>({
     validate: schemaResolver(schema),
     initialValues: {
-      name:     '',
-      species:  '',
-      category: 'SPS',
-      origin:   'Aquacultured',
-      notes:    '',
+      name:      '',
+      species:   '',
+      category:  'SPS',
+      origin:    'Aquacultured',
+      notes:     '',
+      tankName:  '',
+      lightPar:  '',
+      flowLevel: '',
     },
   });
 
-  function handleDrop(files: File[]) {
-    const file = files[0];
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      notifications.show({ title: 'File too large', message: 'Max 8 MB', color: 'red' });
+      return;
+    }
     setPendingFile(file);
     setPreview(URL.createObjectURL(file));
+    e.target.value = '';
   }
 
   function clearPhoto() {
@@ -103,6 +115,7 @@ export function AddSpecimenDrawer({ opened, onClose, onSubmit }: AddSpecimenDraw
       }
 
       await onSubmit({ ...values, photoUrl, photoKey });
+      track('specimen_added', { category: values.category, hasPhoto: !!photoUrl });
 
       clearPhoto();
       form.reset();
@@ -128,6 +141,7 @@ export function AddSpecimenDrawer({ opened, onClose, onSubmit }: AddSpecimenDraw
       onClose={handleClose}
       position="right"
       size={480}
+      trapFocus={false}
       title={
         <Stack gap={2}>
           <Text style={{ fontFamily: 'var(--font-sora)', fontWeight: 700, fontSize: 16 }}>
@@ -149,43 +163,46 @@ export function AddSpecimenDrawer({ opened, onClose, onSubmit }: AddSpecimenDraw
             <Text style={{ ...EYEBROW, marginBottom: 6 }}>photo</Text>
             {preview ? (
               <Box style={{ position: 'relative' }}>
-                <Image
-                  src={preview}
-                  alt="Preview"
-                  radius="md"
-                  style={{ width: '100%', height: 160, objectFit: 'cover' }}
-                />
+                <Image src={preview} alt="Preview" radius="md" h={160} w="100%" fit="cover" />
                 <CloseButton
                   size="sm"
                   onClick={clearPhoto}
-                  style={{
-                    position: 'absolute',
-                    top: 6,
-                    right: 6,
-                    background: 'rgba(0,0,0,0.5)',
-                    color: '#fff',
-                    borderRadius: 999,
-                  }}
+                  style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,0.5)', color: '#fff', borderRadius: 999 }}
                 />
               </Box>
             ) : (
-              <Dropzone
-                onDrop={handleDrop}
-                accept={IMAGE_MIME_TYPE}
-                maxSize={8 * 1024 * 1024}
-                maxFiles={1}
-                styles={{ root: { minHeight: 100 } }}
+              <Box
+                component="label"
+                htmlFor="specimen-photo-input"
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  minHeight: 100,
+                  border: '2px dashed var(--mantine-color-default-border)',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  padding: '20px 16px',
+                }}
               >
-                <Group justify="center" gap="xs" style={{ minHeight: 80, pointerEvents: 'none' }} align="center">
-                  <Dropzone.Accept><IconUpload size={22} stroke={1.5} color="var(--mantine-color-ocean-6)" /></Dropzone.Accept>
-                  <Dropzone.Reject><IconX size={22} stroke={1.5} color="var(--mantine-color-red-6)" /></Dropzone.Reject>
-                  <Dropzone.Idle><IconPhoto size={22} stroke={1.5} color="var(--mantine-color-dimmed)" /></Dropzone.Idle>
-                  <Stack gap={2} align="center">
-                    <Text size="sm" fw={500}>Drop a photo or click to browse</Text>
-                    <Text size="xs" c="dimmed">PNG, JPG up to 8 MB</Text>
-                  </Stack>
-                </Group>
-              </Dropzone>
+                <input
+                  id="specimen-photo-input"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/heic"
+                  style={{ display: 'none' }}
+                  onChange={handleFileChange}
+                />
+                <IconPhoto size={22} stroke={1.5} color="var(--mantine-color-dimmed)" />
+                <Text size="sm" fw={500}>Click to browse</Text>
+                <Text size="xs" c="dimmed">PNG, JPG, WEBP up to 8 MB</Text>
+              </Box>
+            )}
+            {!preview && (
+              <Text size="xs" c="orange" mt={4}>
+                No photo added — specimens with photos get noticed more in Explore. You can add one later too.
+              </Text>
             )}
           </div>
 
@@ -195,16 +212,20 @@ export function AddSpecimenDrawer({ opened, onClose, onSubmit }: AddSpecimenDraw
           <div>
             <Text style={{ ...EYEBROW, marginBottom: 10 }}>identity</Text>
             <Stack gap="sm">
-              <TextInput
+              <Autocomplete
                 label="Common name"
                 placeholder="e.g. Oregon Tort"
                 withAsterisk
+                data={CORAL_COMMON_NAMES}
+                limit={10}
                 {...form.getInputProps('name')}
               />
-              <TextInput
+              <Autocomplete
                 label="Species"
                 placeholder="e.g. Acropora tortuosa"
                 styles={{ input: { fontStyle: 'italic' } }}
+                data={CORAL_SPECIES}
+                limit={8}
                 {...form.getInputProps('species')}
               />
             </Stack>
@@ -220,6 +241,7 @@ export function AddSpecimenDrawer({ opened, onClose, onSubmit }: AddSpecimenDraw
                 { value: 'SOFTIE',  label: 'Softie' },
                 { value: 'ZOA',     label: 'Zoa' },
                 { value: 'ANEMONE', label: 'Anemone' },
+                { value: 'OTHER',   label: 'Other' },
               ]}
               {...form.getInputProps('category')}
             />
@@ -250,6 +272,30 @@ export function AddSpecimenDrawer({ opened, onClose, onSubmit }: AddSpecimenDraw
               maxRows={6}
               {...form.getInputProps('notes')}
             />
+          </div>
+
+          <Divider />
+
+          {/* Tank & husbandry */}
+          <div>
+            <Text style={{ ...EYEBROW, marginBottom: 10 }}>tank &amp; husbandry</Text>
+            <Stack gap="sm">
+              <TextInput
+                label="Tank / system"
+                placeholder="e.g. Main display"
+                {...form.getInputProps('tankName')}
+              />
+              <TextInput
+                label="Light (PAR / intensity)"
+                placeholder="e.g. 180 PAR, medium-high"
+                {...form.getInputProps('lightPar')}
+              />
+              <TextInput
+                label="Flow level"
+                placeholder="e.g. Medium-high"
+                {...form.getInputProps('flowLevel')}
+              />
+            </Stack>
           </div>
 
           <Box pt={4}>

@@ -10,13 +10,10 @@ import {
   Avatar,
 } from '@mantine/core';
 import {
-  IconHeart,
-  IconMessageCircle,
-  IconShare3,
-  IconDots,
   IconArrowRight,
   IconSeeding,
   IconCompass,
+  IconMessageCircle,
 } from '@tabler/icons-react';
 import { coralIdentityGradient } from '@/theme/theme';
 import { getFeedItems } from '@/app/actions/feed';
@@ -80,9 +77,6 @@ function PostCard({ item }: { item: FeedItem }) {
             <span>{timeAgo(item.createdAt)}</span>
           </div>
         </div>
-        <button style={{ background: 'none', border: 0, cursor: 'pointer', padding: 6, color: 'var(--mantine-color-dimmed)', borderRadius: 'var(--mantine-radius-md)' }}>
-          <IconDots size={17} />
-        </button>
       </div>
 
       {/* Body text for lineage */}
@@ -123,14 +117,9 @@ function PostCard({ item }: { item: FeedItem }) {
             )}
           </div>
           {item.kind === 'listing' && item.listingPrice != null ? (
-            <Stack gap={6} align="flex-end">
-              <Text className={css.embedPrice}>${item.listingPrice}</Text>
-              <Button size="xs" variant="light">Reserve</Button>
-            </Stack>
+            <Text className={css.embedPrice}>${item.listingPrice}</Text>
           ) : (
-            <Link href={`/collection/${item.specimenId}`}>
-              <Button component="a" size="xs" variant="default">View</Button>
-            </Link>
+            <Button component="a" href={`/collection/${item.specimenId}`} size="xs" variant="default">View</Button>
           )}
         </div>
       )}
@@ -158,18 +147,6 @@ function PostCard({ item }: { item: FeedItem }) {
         </div>
       )}
 
-      {/* Foot */}
-      <div className={css.postFoot}>
-        <button className={css.reactBtn}>
-          <IconHeart size={17} /> 0
-        </button>
-        <button className={css.reactBtn}>
-          <IconMessageCircle size={17} /> 0
-        </button>
-        <button className={css.reactBtn}>
-          <IconShare3 size={16} />
-        </button>
-      </div>
     </Paper>
   );
 }
@@ -186,9 +163,7 @@ function RightRail() {
         <Text size="xs" c="dimmed" mb={12} style={{ lineHeight: 1.6 }}>
           Find other reef keepers, browse public collections, and follow the ones you like.
         </Text>
-        <Link href="/explore">
-          <Button component="a" variant="light" size="xs" fullWidth>Explore keepers</Button>
-        </Link>
+        <Button component="a" href="/explore" variant="light" size="xs" fullWidth>Explore keepers</Button>
       </Paper>
 
       <Paper withBorder p="md">
@@ -199,9 +174,7 @@ function RightRail() {
         <Text size="xs" c="dimmed" mb={12} style={{ lineHeight: 1.6 }}>
           Ask questions, share tips, and talk frags with other hobbyists.
         </Text>
-        <Link href="/discuss">
-          <Button component="a" variant="light" size="xs" fullWidth>Go to Discuss</Button>
-        </Link>
+        <Button component="a" href="/discuss" variant="light" size="xs" fullWidth>Go to Discuss</Button>
       </Paper>
 
       <Text size="xs" c="dimmed" px={4} style={{ lineHeight: 1.7 }}>
@@ -237,9 +210,7 @@ export default async function FeedPage() {
                 <Text c="dimmed" size="sm" ta="center">
                   Your feed is empty. Follow some keepers or add corals to get started.
                 </Text>
-                <Link href="/explore">
-                  <Button component="a" variant="light" size="sm">Explore keepers</Button>
-                </Link>
+                <Button component="a" href="/explore" variant="light" size="sm">Explore keepers</Button>
               </Stack>
             </Paper>
           )}
@@ -261,11 +232,6 @@ export default async function FeedPage() {
             </>
           )}
 
-          {items.length > 0 && (
-            <Group justify="center">
-              <Button variant="default" size="sm">Load more</Button>
-            </Group>
-          )}
         </Stack>
 
         {/* Right rail */}

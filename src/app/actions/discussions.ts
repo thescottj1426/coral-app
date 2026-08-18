@@ -1,15 +1,10 @@
 'use server';
 
-import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
-import { auth } from '@/lib/auth';
 import { pool } from '@/lib/db';
+import { getCurrentUser } from '@/lib/getCurrentUser';
+import { createNotification } from '@/app/actions/notifications';
 
-async function getCurrentUser() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user) throw new Error('Not authenticated');
-  return session.user;
-}
 
 export type ThreadType = 'discussion' | 'question' | 'health' | 'trade';
 
@@ -160,6 +155,20 @@ export async function createReply(data: {
     [data.threadId]
   );
 
+  const { rows: threadRows } = await pool.query<{ authorId: string }>(
+    `SELECT "authorId" FROM public."Thread" WHERE id = $1`,
+    [data.threadId]
+  );
+  if (threadRows[0]) {
+    createNotification({
+      userId: threadRows[0].authorId,
+      type: 'REPLY',
+      fromUserId: user.id,
+      targetType: 'THREAD',
+      targetId: data.threadId,
+    }).catch((err) => console.error('[discussions] reply notification failed:', err));
+  }
+
   revalidatePath(`/collection/${data.specimenId}/discussion/${data.threadId}`);
   revalidatePath(`/discuss/${data.threadId}`);
 }
@@ -169,7 +178,7 @@ export async function markBestAnswer(data: {
   threadId: string;
   specimenId: string;
 }): Promise<void> {
-  await getCurrentUser();
+  const user = await getCurrentUser();
   await pool.query(
     `UPDATE public."ThreadReply" SET "isBest" = false WHERE "threadId" = $1`,
     [data.threadId]
@@ -182,6 +191,21 @@ export async function markBestAnswer(data: {
     `UPDATE public."Thread" SET resolved = true WHERE id = $1`,
     [data.threadId]
   );
+
+  const { rows: replyRows } = await pool.query<{ authorId: string }>(
+    `SELECT "authorId" FROM public."ThreadReply" WHERE id = $1`,
+    [data.replyId]
+  );
+  if (replyRows[0]) {
+    createNotification({
+      userId: replyRows[0].authorId,
+      type: 'BEST_ANSWER',
+      fromUserId: user.id,
+      targetType: 'THREAD',
+      targetId: data.threadId,
+    }).catch((err) => console.error('[discussions] best-answer notification failed:', err));
+  }
+
   revalidatePath(`/collection/${data.specimenId}/discussion/${data.threadId}`);
   revalidatePath(`/discuss/${data.threadId}`);
 }
