@@ -17,7 +17,7 @@ interface PathChoiceProps {
 }
 
 const HOBBYIST_BULLETS = [
-  'Unlimited corals in your collection',
+  'Your whole collection, catalogued',
   'RF codes + lineage tracing',
   'Public profile and shareable coral pages',
 ];

@@ -6,6 +6,7 @@ import { getCurrentUser } from '@/lib/getCurrentUser';
 import { sendEmail } from '@/lib/email';
 import { welcomeTemplate } from '@/lib/emailTemplates';
 import { uniqueRFCode } from '@/lib/rfCode';
+import { checkSpecimenCap } from '@/lib/entitlements';
 
 export type SpecimenRow = {
   id: string;
@@ -54,8 +55,12 @@ export async function createSpecimen(data: {
   flowLevel?: string;
   photoUrl?: string;
   photoKey?: string;
-}): Promise<SpecimenRow> {
+}): Promise<SpecimenRow | { error: string }> {
   const user = await getCurrentUser();
+
+  const cap = await checkSpecimenCap(user);
+  if (!cap.ok) return { error: cap.error };
+
   const rfCode = await uniqueRFCode();
   const identityHue = Math.floor(Math.random() * 360);
 

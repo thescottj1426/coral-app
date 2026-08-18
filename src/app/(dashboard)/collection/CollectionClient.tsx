@@ -140,9 +140,11 @@ interface CollectionClientProps {
   stats: DashboardStats;
   listings: MyListing[];
   firstName: string;
+  specimenCap: number | null;
 }
 
-export function CollectionClient({ specimens, stats, listings, firstName }: CollectionClientProps) {
+export function CollectionClient({ specimens, stats, listings, firstName, specimenCap }: CollectionClientProps) {
+  const atCap = specimenCap !== null && specimens.length >= specimenCap;
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [, startTransition] = useTransition();
@@ -152,7 +154,10 @@ export function CollectionClient({ specimens, stats, listings, firstName }: Coll
     name: string; species?: string; category: string;
     origin?: string; notes?: string; photoUrl?: string; photoKey?: string;
   }) {
-    await createSpecimen(values);
+    const res = await createSpecimen(values);
+    // Thrown client-side so the drawer's own catch surfaces the message —
+    // server-action errors are redacted in production builds.
+    if ('error' in res) throw new Error(res.error);
     setDrawerOpen(false);
     startTransition(() => router.refresh());
   }
@@ -191,11 +196,19 @@ export function CollectionClient({ specimens, stats, listings, firstName }: Coll
             style={{ fontSize: 22, fontFamily: 'var(--font-sora)', fontWeight: 700, margin: 0 }}>
             {firstName}&apos;s collection
           </Text>
-          <Text size="sm" c="dimmed" mt={2}>
-            {specimens.length} specimen{specimens.length !== 1 ? 's' : ''}
+          <Text size="sm" c={atCap ? 'orange' : 'dimmed'} mt={2}>
+            {specimens.length}
+            {specimenCap !== null && ` / ${specimenCap}`}
+            {' '}specimen{specimens.length !== 1 ? 's' : ''}
+            {atCap && ' · free limit reached'}
           </Text>
         </div>
-        <Button leftSection={<IconPlus size={14} />} onClick={() => setDrawerOpen(true)}>
+        <Button
+          leftSection={<IconPlus size={14} />}
+          onClick={() => setDrawerOpen(true)}
+          disabled={atCap}
+          title={atCap ? `Free collections are limited to ${specimenCap} specimens.` : undefined}
+        >
           Add specimen
         </Button>
       </Group>

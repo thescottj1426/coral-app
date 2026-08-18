@@ -3,6 +3,18 @@
 import { headers } from 'next/headers';
 import { auth } from './auth';
 import { pool } from './db';
+import { FREE_CAP_ENABLED_AT, type Plan } from './entitlements';
+
+type UserRow = { id: string; plan: Plan; capExempt: boolean };
+
+// capExempt is computed in SQL: "createdAt" is timestamp-without-tz, and the Neon
+// driver parses it into host-local time, so comparing in JS shifts the cutoff.
+const SELECT_USER = `
+  SELECT id,
+         plan::text AS plan,
+         ($2::timestamp IS NOT NULL AND "createdAt" < $2::timestamp) AS "capExempt"
+  FROM public."User"
+  WHERE email = $1`;
 
 export async function getCurrentUser() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -10,13 +22,10 @@ export async function getCurrentUser() {
 
   // Look up the app User.id by email — handles migration from old auth system
   // where User.id (CUID) may differ from session.user.id (better-auth ID).
-  const { rows } = await pool.query<{ id: string }>(
-    `SELECT id FROM public."User" WHERE email = $1`,
-    [session.user.email]
-  );
+  const { rows } = await pool.query<UserRow>(SELECT_USER, [session.user.email, FREE_CAP_ENABLED_AT]);
 
   if (rows.length > 0) {
-    return { ...session.user, id: rows[0].id };
+    return { ...session.user, ...rows[0] };
   }
 
   // No User record — self-heal
@@ -30,5 +39,9 @@ export async function getCurrentUser() {
     [session.user.id, session.user.id, fallbackUsername, session.user.email]
   ).catch(() => {});
 
-  return session.user;
+  // Re-read so every caller gets the same shape, always carrying a real User.id.
+  const { rows: healed } = await pool.query<UserRow>(SELECT_USER, [session.user.email, FREE_CAP_ENABLED_AT]);
+  if (healed.length === 0) throw new Error('Could not resolve user record');
+
+  return { ...session.user, ...healed[0] };
 }

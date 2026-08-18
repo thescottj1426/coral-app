@@ -5,13 +5,14 @@ import { pool } from '@/lib/db';
 import { getCurrentUser } from '@/lib/getCurrentUser';
 import { uniqueRFCode } from '@/lib/rfCode';
 import { createNotification } from '@/app/actions/notifications';
+import { checkSpecimenCap } from '@/lib/entitlements';
 
 export type LineageNode = {
   id: string;
   name: string;
   rfCode: string | null;
   identityHue: number | null;
-  ownerUsername: string;
+  ownerUsername: string | null;
   depth: number;
 };
 
@@ -30,7 +31,7 @@ export async function getLineage(specimenId: string): Promise<LineageNode[]> {
      SELECT c.id, c.name, c."rfCode", c."identityHue", u.username AS "ownerUsername", chain.depth
      FROM chain
      JOIN public."Coral" c ON c.id = chain."parentId"
-     JOIN public."User" u ON u.id = c."ownerId"
+     LEFT JOIN public."User" u ON u.id = c."ownerId"
      ORDER BY chain.depth DESC`,
     [specimenId]
   );
@@ -42,7 +43,7 @@ export async function getChildren(specimenId: string): Promise<LineageNode[]> {
     `SELECT c.id, c.name, c."rfCode", c."identityHue", u.username AS "ownerUsername", 1 AS depth
      FROM public."Lineage" l
      JOIN public."Coral" c ON c.id = l."childId"
-     JOIN public."User" u ON u.id = c."ownerId"
+     LEFT JOIN public."User" u ON u.id = c."ownerId"
      WHERE l."parentId" = $1
      ORDER BY c."createdAt" ASC`,
     [specimenId]
@@ -89,6 +90,11 @@ export async function lookupParentCoral(rfCode: string): Promise<ParentCoralInfo
 export async function claimFrag(rfCode: string): Promise<{ coralId: string; coralRfCode: string } | { error: string }> {
   const user = await getCurrentUser();
   const normalized = rfCode.toUpperCase().trim();
+
+  // Covers both branches below — branch A is an UPDATE, so a guard at the
+  // INSERT site alone would miss it.
+  const cap = await checkSpecimenCap(user);
+  if (!cap.ok) return { error: cap.error };
 
   // Check if it's a pre-generated unclaimed frag
   const { rows: fragRows } = await pool.query<{ id: string; rfCode: string }>(
@@ -163,8 +169,9 @@ export async function createFrags(parentId: string, count: number): Promise<stri
 
   const parent = parentRows[0];
   const codes: string[] = [];
+  const n = Math.min(Math.max(1, Math.floor(count)), 25);
 
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < n; i++) {
     const rfCode = await uniqueRFCode();
     const identityHue = Math.floor(Math.random() * 360);
 

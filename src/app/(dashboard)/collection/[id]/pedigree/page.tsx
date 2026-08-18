@@ -21,13 +21,13 @@ interface Props {
 
 export default async function PedigreePage({ params }: Props) {
   const { id } = await params;
-  const [specimen, ancestors, children] = await Promise.all([
-    getSpecimen(id),
-    getLineage(id),
-    getChildren(id),
-  ]);
-
+  const specimen = await getSpecimen(id);
   if (!specimen) notFound();
+
+  const [ancestors, children] = await Promise.all([
+    getLineage(specimen.id),
+    getChildren(specimen.id),
+  ]);
 
   return (
     <Box p="lg" maw={900}>
@@ -98,7 +98,7 @@ export default async function PedigreePage({ params }: Props) {
                         {node.rfCode}
                       </Text>
                     )}
-                    <Text size="xs" c="dimmed">@{node.ownerUsername}</Text>
+                    <Text size="xs" c="dimmed">{node.ownerUsername ? `@${node.ownerUsername}` : 'Unclaimed'}</Text>
                   </Group>
                 </Stack>
                 <Badge size="xs" variant="light" color="ocean">
@@ -162,7 +162,7 @@ export default async function PedigreePage({ params }: Props) {
                             {child.rfCode}
                           </Text>
                         )}
-                        <Text size="xs" c="dimmed">@{child.ownerUsername}</Text>
+                        <Text size="xs" c="dimmed">{child.ownerUsername ? `@${child.ownerUsername}` : 'Unclaimed'}</Text>
                       </Group>
                     </Stack>
                     <Badge size="xs" variant="light" color="teal">Frag</Badge>

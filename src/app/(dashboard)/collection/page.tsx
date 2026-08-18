@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/getCurrentUser';
 import { getMySpecimens } from '@/app/actions/specimens';
 import { getDashboardStats, getMyListings, type DashboardStats, type MyListing } from '@/app/actions/dashboard';
 import { CollectionClient } from './CollectionClient';
+import { specimenCapFor } from '@/lib/entitlements';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,7 @@ export default async function MyCollectionPage() {
       stats={stats}
       listings={listings}
       firstName={firstName}
+      specimenCap={specimenCapFor(user)}
     />
   );
 }

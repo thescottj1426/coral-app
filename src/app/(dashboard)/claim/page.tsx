@@ -68,7 +68,7 @@ function LineageChain({ parent }: { parent: ParentCoralInfo }) {
           step.kind === 'parent' ? step.coral.rfCode :
           null;
         const label =
-          step.kind === 'ancestor' ? `@${step.node.ownerUsername}` :
+          step.kind === 'ancestor' ? (step.node.ownerUsername ? `@${step.node.ownerUsername}` : 'Unclaimed') :
           step.kind === 'parent' ? `@${step.coral.ownerUsername}` :
           'You';
         const hue =

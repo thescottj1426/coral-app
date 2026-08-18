@@ -62,7 +62,7 @@ function LineagePill({ node, dim }: { node: LineageNode; dim?: boolean }) {
       <Box style={{ width: 10, height: 10, borderRadius: '50%', background: bg, flexShrink: 0 }} />
       <Stack gap={0}>
         <Text size="xs" fw={600} style={{ lineHeight: 1.2 }}>{node.name}</Text>
-        <Text size="xs" c="dimmed">@{node.ownerUsername}</Text>
+        <Text size="xs" c="dimmed">{node.ownerUsername ? `@${node.ownerUsername}` : 'Unclaimed'}</Text>
       </Stack>
     </Group>
   );

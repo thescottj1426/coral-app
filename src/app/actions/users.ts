@@ -166,6 +166,25 @@ export type UpdateProfileData = {
   specialty?: string[];
 };
 
+// Explicit whitelist — the only columns updateProfile may ever write.
+// Privileged columns (plan, verified, isAdmin) must never be added here;
+// plan is written only by setPlan() in @/lib/entitlements.
+const PROFILE_COLUMNS: Record<keyof UpdateProfileData, string> = {
+  displayName: '"displayName"',
+  bio:         'bio',
+  location:    'location',
+  isSeller:    '"isSeller"',
+  shopName:    '"shopName"',
+  shopBio:     '"shopBio"',
+  specialty:   'specialty',
+};
+
+function normalizeProfileValue(key: keyof UpdateProfileData, data: UpdateProfileData): unknown {
+  if (key === 'isSeller') return data.isSeller ?? false;
+  if (key === 'specialty') return data.specialty?.length ? `{${data.specialty.join(',')}}` : null;
+  return data[key] ?? null;
+}
+
 export async function updateProfile(data: UpdateProfileData): Promise<void> {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) throw new Error('Not authenticated');
@@ -175,15 +194,11 @@ export async function updateProfile(data: UpdateProfileData): Promise<void> {
   const params: unknown[] = [userId];
   let i = 2;
 
-  if ('displayName' in data) { setClauses.push(`"displayName" = $${i++}`); params.push(data.displayName ?? null); }
-  if ('bio' in data)         { setClauses.push(`bio = $${i++}`); params.push(data.bio ?? null); }
-  if ('location' in data)    { setClauses.push(`location = $${i++}`); params.push(data.location ?? null); }
-  if ('isSeller' in data)    { setClauses.push(`"isSeller" = $${i++}`); params.push(data.isSeller ?? false); }
-  if ('shopName' in data)    { setClauses.push(`"shopName" = $${i++}`); params.push(data.shopName ?? null); }
-  if ('shopBio' in data)     { setClauses.push(`"shopBio" = $${i++}`); params.push(data.shopBio ?? null); }
-  if ('specialty' in data) {
-    setClauses.push(`specialty = $${i++}`);
-    params.push(data.specialty?.length ? `{${data.specialty.join(',')}}` : null);
+  for (const key of Object.keys(data) as (keyof UpdateProfileData)[]) {
+    const column = PROFILE_COLUMNS[key];
+    if (!column) continue;
+    setClauses.push(`${column} = $${i++}`);
+    params.push(normalizeProfileValue(key, data));
   }
 
   if (!setClauses.length) return;
