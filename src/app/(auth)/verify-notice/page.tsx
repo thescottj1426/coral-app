@@ -9,16 +9,25 @@ import { useRouter } from 'next/navigation';
 export default function VerifyNoticePage() {
   const router = useRouter();
   const [resendSent, setResendSent] = useState(false);
+  const [resendError, setResendError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function handleResend() {
     startTransition(async () => {
+      setResendError(null);
       const session = await authClient.getSession();
-      if (!session.data?.user?.email) return;
-      await authClient.sendVerificationEmail({
+      if (!session.data?.user?.email) {
+        setResendError('Could not read your session. Try signing in again.');
+        return;
+      }
+      const { error } = await authClient.sendVerificationEmail({
         email: session.data.user.email,
         callbackURL: '/dashboard',
       });
+      if (error) {
+        setResendError(error.message ?? 'We could not send the email. Please try again later.');
+        return;
+      }
       setResendSent(true);
     });
   }
@@ -62,9 +71,14 @@ export default function VerifyNoticePage() {
               <Text size="sm" c="teal.7" fw={500}>Email resent — check your inbox.</Text>
             </Stack>
           ) : (
-            <Button variant="light" fullWidth loading={isPending} onClick={handleResend}>
-              Resend verification email
-            </Button>
+            <Stack gap={8} style={{ width: '100%' }}>
+              <Button variant="light" fullWidth loading={isPending} onClick={handleResend}>
+                Resend verification email
+              </Button>
+              {resendError && (
+                <Text size="xs" c="red" ta="center">{resendError}</Text>
+              )}
+            </Stack>
           )}
 
           <Button variant="subtle" color="gray" size="sm" onClick={handleSignOut}>

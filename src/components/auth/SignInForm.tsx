@@ -34,6 +34,7 @@ export function SignInForm() {
   const [failCount, setFailCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+  const [resendError, setResendError] = useState<string | null>(null);
   const [resendSent, setResendSent] = useState(false);
   const [isResending, startResend] = useTransition();
 
@@ -72,7 +73,12 @@ export function SignInForm() {
   function handleResend() {
     if (!unverifiedEmail) return;
     startResend(async () => {
-      await authClient.sendVerificationEmail({ email: unverifiedEmail, callbackURL: '/dashboard' });
+      setResendError(null);
+      const { error } = await authClient.sendVerificationEmail({ email: unverifiedEmail, callbackURL: '/dashboard' });
+      if (error) {
+        setResendError(error.message ?? 'We could not send the email. Please try again later.');
+        return;
+      }
       setResendSent(true);
     });
   }
@@ -82,20 +88,25 @@ export function SignInForm() {
       <div className={styles.formPanel}>
         <div className={styles.formInner}>
           <div className={styles.formHeader}>
-            <Title order={2}>Check your inbox</Title>
+            <Title order={2}>Verify your email</Title>
             <Text c="dimmed" size="sm" mt={2}>
-              We sent a verification link to <strong>{unverifiedEmail}</strong>
+              <strong>{unverifiedEmail}</strong> hasn&apos;t been verified yet.
             </Text>
           </div>
           <Text size="sm" c="dimmed" style={{ lineHeight: 1.6 }}>
-            Click the link in that email to activate your account, then come back to sign in.
+            Send yourself a verification link, then click it to activate your account and come back to sign in.
           </Text>
           {resendSent ? (
-            <Text size="sm" c="teal.7" fw={500}>Email resent — check your inbox.</Text>
+            <Text size="sm" c="teal.7" fw={500}>Email sent — check your inbox.</Text>
           ) : (
-            <Button variant="light" fullWidth loading={isResending} onClick={handleResend}>
-              Resend verification email
-            </Button>
+            <>
+              <Button variant="light" fullWidth loading={isResending} onClick={handleResend}>
+                Send verification email
+              </Button>
+              {resendError && (
+                <Text size="xs" c="red" ta="center">{resendError}</Text>
+              )}
+            </>
           )}
           <Button variant="subtle" fullWidth onClick={() => setUnverifiedEmail(null)}>
             Back to sign in

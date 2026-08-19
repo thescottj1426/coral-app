@@ -37,9 +37,9 @@ export async function getExploreCollectors(): Promise<ExploreCollector[]> {
   const { rows } = await pool.query<ExploreCollector>(
     `SELECT u.id, u.username, u."displayName", COUNT(c.id)::int AS "specimenCount"
      FROM public."User" u
-     JOIN public."Coral" c ON c."ownerId" = u.id
-     GROUP BY u.id, u.username, u."displayName"
-     ORDER BY "specimenCount" DESC
+     LEFT JOIN public."Coral" c ON c."ownerId" = u.id
+     GROUP BY u.id, u.username, u."displayName", u."createdAt"
+     ORDER BY "specimenCount" DESC, u."createdAt" DESC
      LIMIT 20`
   );
   return rows;
