@@ -12,6 +12,5 @@ export default async function DashboardLayout({
 }) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) redirect('/sign-in');
-  if (!session.user.emailVerified) redirect('/verify-notice');
   return <AppShellWrapper>{children}</AppShellWrapper>;
 }

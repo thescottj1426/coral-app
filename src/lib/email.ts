@@ -13,7 +13,16 @@ const resend = process.env.RESEND_API_KEY
 
 export type SendResult = { ok: true } | { ok: false; error: string };
 
+// Kill switch: all outbound email is paused. Flip to false (or set
+// EMAILS_ENABLED=true) to resume sending.
+const EMAILS_PAUSED = process.env.EMAILS_ENABLED !== 'true';
+
 export async function sendEmail(to: string, subject: string, html: string): Promise<SendResult> {
+  if (EMAILS_PAUSED) {
+    console.log(`[email] PAUSED — would have sent to ${to} ("${subject}")`);
+    return { ok: true };
+  }
+
   if (!resend) {
     const error = 'RESEND_API_KEY is not set — no email was sent';
     console.error(`[email] FAILED to ${to} ("${subject}"): ${error}`);

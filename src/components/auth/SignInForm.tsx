@@ -14,7 +14,7 @@ import { useForm, schemaResolver } from '@mantine/form';
 import { z } from 'zod';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useState } from 'react';
 import { signIn, authClient } from '@/lib/auth-client';
 import styles from './auth.module.css';
 
@@ -33,10 +33,6 @@ export function SignInForm() {
   const [error, setError] = useState<string | null>(null);
   const [failCount, setFailCount] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
-  const [resendError, setResendError] = useState<string | null>(null);
-  const [resendSent, setResendSent] = useState(false);
-  const [isResending, startResend] = useTransition();
 
   const form = useForm<FormValues>({
     validate: schemaResolver(schema),
@@ -45,7 +41,6 @@ export function SignInForm() {
 
   async function handleSubmit(values: FormValues) {
     setError(null);
-    setUnverifiedEmail(null);
     setLoading(true);
     try {
       const result = await signIn.email({
@@ -55,12 +50,8 @@ export function SignInForm() {
         callbackURL: '/dashboard',
       });
       if (result.error) {
-        if (result.error.code === 'EMAIL_NOT_VERIFIED') {
-          setUnverifiedEmail(values.email);
-        } else {
-          setFailCount((n) => n + 1);
-          setError(result.error.message ?? 'Invalid email or password');
-        }
+        setFailCount((n) => n + 1);
+        setError(result.error.message ?? 'Invalid email or password');
       } else {
         router.push('/dashboard');
         router.refresh();
@@ -68,52 +59,6 @@ export function SignInForm() {
     } finally {
       setLoading(false);
     }
-  }
-
-  function handleResend() {
-    if (!unverifiedEmail) return;
-    startResend(async () => {
-      setResendError(null);
-      const { error } = await authClient.sendVerificationEmail({ email: unverifiedEmail, callbackURL: '/dashboard' });
-      if (error) {
-        setResendError(error.message ?? 'We could not send the email. Please try again later.');
-        return;
-      }
-      setResendSent(true);
-    });
-  }
-
-  if (unverifiedEmail) {
-    return (
-      <div className={styles.formPanel}>
-        <div className={styles.formInner}>
-          <div className={styles.formHeader}>
-            <Title order={2}>Verify your email</Title>
-            <Text c="dimmed" size="sm" mt={2}>
-              <strong>{unverifiedEmail}</strong> hasn&apos;t been verified yet.
-            </Text>
-          </div>
-          <Text size="sm" c="dimmed" style={{ lineHeight: 1.6 }}>
-            Send yourself a verification link, then click it to activate your account and come back to sign in.
-          </Text>
-          {resendSent ? (
-            <Text size="sm" c="teal.7" fw={500}>Email sent — check your inbox.</Text>
-          ) : (
-            <>
-              <Button variant="light" fullWidth loading={isResending} onClick={handleResend}>
-                Send verification email
-              </Button>
-              {resendError && (
-                <Text size="xs" c="red" ta="center">{resendError}</Text>
-              )}
-            </>
-          )}
-          <Button variant="subtle" fullWidth onClick={() => setUnverifiedEmail(null)}>
-            Back to sign in
-          </Button>
-        </div>
-      </div>
-    );
   }
 
   return (

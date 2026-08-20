@@ -43,9 +43,10 @@ export default function ForgotPasswordPage() {
                 <IconCheck size={28} />
               </ThemeIcon>
               <div className={styles.formHeader}>
-                <Title order={2}>Check your inbox</Title>
+                <Title order={2}>Password reset is paused</Title>
                 <Text c="dimmed" size="sm" mt={2}>
-                  We sent a reset link to <strong>{email}</strong>. It expires in 1 hour.
+                  We&apos;re not sending email right now, so no reset link will arrive for{' '}
+                  <strong>{email}</strong>. Contact us and we&apos;ll get you back in.
                 </Text>
               </div>
             </Stack>

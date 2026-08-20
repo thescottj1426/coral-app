@@ -65,7 +65,7 @@ export function SignUpForm() {
         setError(result.error.message ?? 'Something went wrong');
       } else {
         track('signup_completed');
-        router.push('/verify-notice');
+        router.push('/onboarding');
         router.refresh();
       }
     } finally {
