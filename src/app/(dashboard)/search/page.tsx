@@ -53,7 +53,7 @@ export default async function SearchPage({ searchParams }: Props) {
           {results.map((s) => (
             <Link key={s.id} href={`/coral/${s.rfCode ?? s.id}`} style={{ textDecoration: 'none' }}>
               <Paper withBorder style={{ overflow: 'hidden', display: 'block' }}>
-                <CoralCardPhoto coverPhotoUrl={s.coverPhotoUrl} rfCode={s.rfCode ?? s.id} height={72} />
+                <CoralCardPhoto coverPhotoUrl={s.coverPhotoUrl} rfCode={s.rfCode ?? s.id} />
                 <Box p="xs">
                   <Group gap={4} mb={2} wrap="nowrap">
                     <Text size="sm" fw={600} truncate style={{ flex: 1 }}>{s.name}</Text>

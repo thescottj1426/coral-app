@@ -39,3 +39,12 @@
   padding: 40px 12px 12px;
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.72));
 }
+
+/* Card photo area — portrait ratio so phone-shot coral photos aren't cropped
+   to a letterbox slice. Scales with column width across breakpoints. */
+.photoWrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+}

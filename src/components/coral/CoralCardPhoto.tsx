@@ -8,17 +8,27 @@ import { coralIdentityGradient } from '@/theme/theme';
 interface CoralCardPhotoProps {
   coverPhotoUrl?: string | null;
   rfCode: string;
+  /** Photo area shape. Scales with card width so the crop stays consistent across breakpoints. */
+  aspectRatio?: string;
+  /** Fixed pixel height. Overrides aspectRatio when set. */
   height?: number;
   priority?: boolean;
 }
 
-export function CoralCardPhoto({ coverPhotoUrl, rfCode, height = 80, priority = false }: CoralCardPhotoProps) {
+export function CoralCardPhoto({
+  coverPhotoUrl,
+  rfCode,
+  aspectRatio = '4 / 3',
+  height,
+  priority = false,
+}: CoralCardPhotoProps) {
   const [imgError, setImgError] = useState(false);
 
   const showImage = coverPhotoUrl && !imgError;
+  const sizing = height != null ? { height } : { aspectRatio };
 
   return (
-    <Box style={{ height, position: 'relative', overflow: 'hidden' }}>
+    <Box style={{ ...sizing, position: 'relative', overflow: 'hidden' }}>
       {showImage ? (
         <Image
           src={coverPhotoUrl}
@@ -30,7 +40,7 @@ export function CoralCardPhoto({ coverPhotoUrl, rfCode, height = 80, priority = 
           onError={() => setImgError(true)}
         />
       ) : (
-        <Box style={{ height, background: coralIdentityGradient(rfCode) }} />
+        <Box style={{ width: '100%', height: '100%', background: coralIdentityGradient(rfCode) }} />
       )}
     </Box>
   );

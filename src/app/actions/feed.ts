@@ -35,6 +35,33 @@ export type FeedItem = {
   listingNotes?: string | null;
 };
 
+export type NewKeeper = {
+  id: string;
+  username: string;
+  displayName: string | null;
+  hue: number;
+  createdAt: string;
+  specimenCount: number;
+};
+
+export async function getNewKeepers(limit = 8): Promise<NewKeeper[]> {
+  const { rows } = await pool.query<NewKeeper>(
+    `SELECT
+       u.id,
+       u.username,
+       u."displayName",
+       ABS(HASHTEXT(u.id)) % 360 AS hue,
+       u."createdAt",
+       (SELECT COUNT(*)::int FROM public."Coral" c WHERE c."ownerId" = u.id) AS "specimenCount"
+     FROM public."User" u
+     WHERE u."createdAt" > NOW() - INTERVAL '30 days'
+     ORDER BY u."createdAt" DESC
+     LIMIT $1`,
+    [limit]
+  );
+  return rows;
+}
+
 export async function getFeedItems(limit = 30): Promise<FeedItem[]> {
   const session = await auth.api.getSession({ headers: await headers() }).catch(() => null);
   const currentUserId = session?.user?.id ?? null;

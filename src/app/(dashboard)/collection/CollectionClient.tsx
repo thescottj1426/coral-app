@@ -30,7 +30,7 @@ function SpecimenCard({ specimen }: { specimen: SpecimenRow }) {
   return (
     <Link href={`/collection/${specimen.rfCode ?? specimen.id}`} className={styles.card}>
       <Paper withBorder style={{ overflow: 'hidden' }}>
-        <div style={{ width: '100%', height: 240, position: 'relative', overflow: 'hidden' }}>
+        <div className={styles.photoWrap}>
           {specimen.coverPhotoUrl ? (
             <Image
               src={specimen.coverPhotoUrl}

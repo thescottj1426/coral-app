@@ -14,10 +14,11 @@ import {
   IconSeeding,
   IconCompass,
   IconMessageCircle,
+  IconSparkles,
 } from '@tabler/icons-react';
 import { coralIdentityGradient } from '@/theme/theme';
-import { getFeedItems } from '@/app/actions/feed';
-import type { FeedItem } from '@/app/actions/feed';
+import { getFeedItems, getNewKeepers } from '@/app/actions/feed';
+import type { FeedItem, NewKeeper } from '@/app/actions/feed';
 import css from './feed.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -151,6 +152,37 @@ function PostCard({ item }: { item: FeedItem }) {
   );
 }
 
+// ── New keepers ──────────────────────────────────────────────────────────────
+function NewKeepers({ keepers }: { keepers: NewKeeper[] }) {
+  if (keepers.length === 0) return null;
+
+  return (
+    <div className={css.keepers}>
+      <Group gap={8} align="center">
+        <IconSparkles size={15} color="var(--mantine-color-ocean-6)" />
+        <Text fw={600} size="sm">New keepers</Text>
+        <Text size="xs" c="dimmed">joined recently — say hi</Text>
+      </Group>
+
+      <div className={css.keepersRow}>
+        {keepers.map((k) => (
+          <Link key={k.id} href={`/users/${k.username}`} className={css.keeperCard}>
+            <div className={css.keeperAvatar} style={{ background: identGrad(k.hue) }}>
+              {initials(k.displayName, k.username)}
+            </div>
+            <span className={css.keeperName}>{k.displayName ?? k.username}</span>
+            <span className={css.keeperMeta}>
+              {k.specimenCount === 0
+                ? `joined ${timeAgo(k.createdAt)} ago`
+                : `${k.specimenCount} coral${k.specimenCount !== 1 ? 's' : ''}`}
+            </span>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Right rail ───────────────────────────────────────────────────────────────
 function RightRail() {
   return (
@@ -186,7 +218,10 @@ function RightRail() {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default async function FeedPage() {
-  const items = await getFeedItems(30);
+  const [items, newKeepers] = await Promise.all([
+    getFeedItems(30),
+    getNewKeepers(8),
+  ]);
 
   const recent = items.slice(0, Math.ceil(items.length * 0.6));
   const earlier = items.slice(Math.ceil(items.length * 0.6));
@@ -203,6 +238,8 @@ export default async function FeedPage() {
       <Group align="flex-start" gap="lg" wrap="nowrap">
         {/* Main column */}
         <Stack gap="md" style={{ flex: 1, minWidth: 0 }}>
+          <NewKeepers keepers={newKeepers} />
+
           {items.length === 0 && (
             <Paper withBorder p="xl">
               <Stack align="center" gap="sm">

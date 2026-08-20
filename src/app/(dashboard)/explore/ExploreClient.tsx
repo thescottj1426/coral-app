@@ -39,7 +39,7 @@ function SpecimenCard({ s }: { s: ExploreSpecimen }) {
       withBorder
       style={{ textDecoration: 'none', display: 'block', overflow: 'hidden' }}
     >
-      <CoralCardPhoto coverPhotoUrl={s.coverPhotoUrl} rfCode={s.rfCode ?? s.id} height={72} />
+      <CoralCardPhoto coverPhotoUrl={s.coverPhotoUrl} rfCode={s.rfCode ?? s.id} />
       <Stack gap={6} p="sm">
         <Group gap={6} justify="space-between" wrap="nowrap">
           <Text size="sm" fw={700} truncate style={{ flex: 1 }}>{s.name}</Text>
