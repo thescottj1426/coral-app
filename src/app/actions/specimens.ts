@@ -124,9 +124,11 @@ export async function addSpecimenPhoto(data: {
   revalidatePath(`/collection/${data.specimenId}`);
 }
 
+// ownerId/ownerUsername are null for unclaimed frags — rows created by
+// createFrags that stay ownerless until someone claims the RF code.
 export type SpecimenDetail = SpecimenRow & {
-  ownerId: string;
-  ownerUsername: string;
+  ownerId: string | null;
+  ownerUsername: string | null;
   ownerDisplayName: string | null;
   isOwner: boolean;
   fragsGiven: number;
@@ -156,7 +158,7 @@ export async function getPublicSpecimen(rfCodeOrId: string): Promise<SpecimenDet
          '[]'
        ) AS photos
      FROM public."Coral" c
-     JOIN public."User" u ON u.id = c."ownerId"
+     LEFT JOIN public."User" u ON u.id = c."ownerId"
      LEFT JOIN public."CoralPhoto" p ON p."coralId" = c.id
      WHERE c."rfCode" = $1 OR c.id = $1
      GROUP BY c.id, u.username, u."displayName"

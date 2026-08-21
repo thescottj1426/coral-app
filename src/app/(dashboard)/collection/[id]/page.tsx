@@ -39,8 +39,8 @@ function identGrad(hue: number | null, seed: string) {
   return coralIdentityGradient(seed);
 }
 
-function ownerInitials(displayName: string | null, username: string) {
-  const src = displayName ?? username;
+function ownerInitials(displayName: string | null, username: string | null) {
+  const src = displayName ?? username ?? '?';
   return src.split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('');
 }
 
@@ -68,7 +68,9 @@ function photoDateLabel(iso: string) {
 export default async function SpecimenDetailPage({ params }: Props) {
   const { id } = await params;
   const specimen = await getSpecimen(id);
-  if (!specimen) notFound();
+  // getSpecimen inner-joins the owner, so an unclaimed frag never resolves here.
+  // Unclaimed codes are served by the public /coral/[rfCode] page instead.
+  if (!specimen || !specimen.ownerId) notFound();
 
   const isOwner = specimen.isOwner;
   const coverPhoto = specimen.photos[0] ?? null;

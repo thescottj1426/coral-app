@@ -22,17 +22,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const specimen = await getPublicSpecimen(rfCode);
   if (!specimen) return { title: 'Not found — Coral Chest' };
 
+  const unclaimed = specimen.ownerId === null;
+  const owner = specimen.ownerUsername ? `@${specimen.ownerUsername}` : 'Unclaimed frag';
   const description = specimen.notes
-    ?? `${specimen.category ?? 'Coral'} · @${specimen.ownerUsername} · RF ${specimen.rfCode}`;
+    ?? `${specimen.category ?? 'Coral'} · ${owner} · RF ${specimen.rfCode}`;
   const ogImage = specimen.photos[0]
     ? `${APP_URL}${specimen.photos[0].url}`
     : undefined;
 
+  const title = unclaimed
+    ? `${specimen.name} · unclaimed frag ${specimen.rfCode} — Coral Chest`
+    : `${specimen.name} — Coral Chest`;
+
   return {
-    title: `${specimen.name} — Coral Chest`,
+    title,
     description,
     openGraph: {
-      title: `${specimen.name} — Coral Chest`,
+      title,
       description,
       url: `${APP_URL}/coral/${specimen.rfCode}`,
       images: ogImage ? [{ url: ogImage, width: 1200, height: 630, alt: specimen.name }] : [],
@@ -121,13 +127,19 @@ export default async function PublicCoralPage({ params }: Props) {
   const specimen = await getPublicSpecimen(rfCode);
   if (!specimen) notFound();
 
+  // Unclaimed frag — a createFrags row that stays ownerless until someone
+  // claims the RF code. This is the page a frag tag's QR resolves to.
+  const unclaimed = specimen.ownerId === null;
+
   const [ancestors, children, more] = await Promise.all([
     getLineage(specimen.id),
     getChildren(specimen.id),
-    getMoreByOwner(specimen.ownerId, specimen.id, 4),
+    specimen.ownerId ? getMoreByOwner(specimen.ownerId, specimen.id, 4) : Promise.resolve([]),
   ]);
 
   const coverPhoto = specimen.photos[0] ?? null;
+  // The frag itself has no owner; whoever owns its nearest ancestor cut it.
+  const fraggedBy = ancestors[ancestors.length - 1]?.ownerUsername ?? null;
 
   return (
     <Box maw={900} mx="auto" py="lg" px="md">
@@ -151,6 +163,11 @@ export default async function PublicCoralPage({ params }: Props) {
         }} />
         <Stack gap={4} style={{ position: 'absolute', bottom: 20, left: 20 }}>
           <Group gap={8}>
+            {unclaimed && (
+              <Badge variant="filled" size="sm" radius="xl" color="ocean">
+                Unclaimed frag
+              </Badge>
+            )}
             {specimen.category && <CategoryBadge category={specimen.category} />}
             {specimen.origin && (
               <Badge variant="filled" size="sm" radius="xl"
@@ -186,15 +203,28 @@ export default async function PublicCoralPage({ params }: Props) {
             </Stack>
           )}
           <Stack gap={0}>
-            <Text style={EYEBROW}>collector</Text>
-            <Text
-              component="a"
-              href={`/users/${specimen.ownerUsername}`}
-              size="sm" fw={600}
-              style={{ color: 'var(--mantine-primary-color-filled)', textDecoration: 'none' }}
-            >
-              @{specimen.ownerUsername}
-            </Text>
+            <Text style={EYEBROW}>{unclaimed ? 'fragged by' : 'collector'}</Text>
+            {specimen.ownerUsername ? (
+              <Text
+                component="a"
+                href={`/users/${specimen.ownerUsername}`}
+                size="sm" fw={600}
+                style={{ color: 'var(--mantine-primary-color-filled)', textDecoration: 'none' }}
+              >
+                @{specimen.ownerUsername}
+              </Text>
+            ) : fraggedBy ? (
+              <Text
+                component="a"
+                href={`/users/${fraggedBy}`}
+                size="sm" fw={600}
+                style={{ color: 'var(--mantine-primary-color-filled)', textDecoration: 'none' }}
+              >
+                @{fraggedBy}
+              </Text>
+            ) : (
+              <Text size="sm" fw={600} c="dimmed">Not yet claimed</Text>
+            )}
           </Stack>
           {specimen.acquiredDate && (
             <Stack gap={0}>
@@ -206,6 +236,39 @@ export default async function PublicCoralPage({ params }: Props) {
           )}
         </Group>
       </Paper>
+
+      {/* Claim CTA — this page is where a frag tag's QR lands */}
+      {unclaimed && specimen.rfCode && (
+        <Paper
+          withBorder
+          p="md"
+          mb="md"
+          style={{ background: 'var(--mantine-color-ocean-0)', borderColor: 'var(--mantine-color-ocean-3)' }}
+        >
+          <Stack gap={10}>
+            <Stack gap={2}>
+              <Text size="sm" fw={700} c="ocean.9">Holding this frag?</Text>
+              <Text size="xs" c="ocean.8" style={{ lineHeight: 1.6 }}>
+                Claim it with code <strong>{specimen.rfCode}</strong> to add it to your collection
+                and inherit the full lineage above.
+              </Text>
+            </Stack>
+            <Box
+              component="a"
+              href={`/claim?code=${specimen.rfCode}`}
+              style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                alignSelf: 'flex-start',
+                background: 'var(--mantine-primary-color-filled)', color: '#fff',
+                padding: '8px 18px', borderRadius: 'var(--mantine-radius-sm)',
+                textDecoration: 'none', fontSize: 14, fontWeight: 600,
+              }}
+            >
+              Claim this frag
+            </Box>
+          </Stack>
+        </Paper>
+      )}
 
       {/* Notes */}
       {specimen.notes && (
