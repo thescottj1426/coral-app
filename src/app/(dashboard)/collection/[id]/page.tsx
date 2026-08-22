@@ -244,7 +244,7 @@ export default async function SpecimenDetailPage({ params }: Props) {
                 <div className={styles.lineageChain}>
                   {lineage.map((node, i) => (
                     <>
-                      <Link key={node.id} href={`/collection/${node.rfCode ?? node.id}`} className={styles.lineageChip}>
+                      <Link key={node.id} href={`/coral/${node.rfCode ?? node.id}`} className={styles.lineageChip}>
                         <div className={styles.lineageDot} style={{ background: identGrad(node.identityHue, node.id) }} />
                         {node.rfCode ?? node.name}
                       </Link>
@@ -266,7 +266,7 @@ export default async function SpecimenDetailPage({ params }: Props) {
                   </p>
                   <div className={styles.fragRow}>
                     {frags.map(f => (
-                      <Link key={f.id} href={`/collection/${f.rfCode ?? f.id}`} className={styles.fragChip}>
+                      <Link key={f.id} href={`/coral/${f.rfCode ?? f.id}`} className={styles.fragChip}>
                         <div className={styles.lineageDot} style={{ background: identGrad(f.identityHue, f.id), width: 8, height: 8 }} />
                         {f.rfCode ?? f.name}
                       </Link>
