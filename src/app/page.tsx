@@ -1,212 +1,251 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Box, Group, Stack, Text, Button, SimpleGrid } from '@mantine/core';
-import { IconSeeding, IconArrowsShuffle, IconShare3 } from '@tabler/icons-react';
 import { getExploreSpecimens } from '@/app/actions/explore';
+import { getFeedItems } from '@/app/actions/feed';
+import { getHomeStats, getDeepestChain, getTopKeepers } from '@/app/actions/home';
 import { siteUrl } from '@/lib/siteUrl';
+import { coralIdentityGradient } from '@/theme/theme';
+import { HomeSpecimens } from './HomeSpecimens';
+import styles from './home.module.css';
 
 const BASE = siteUrl();
 
-// Rebuilt hourly so newly added corals appear as crawlable links.
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: 'Coral Chest — trace the lineage of every coral',
   description:
-    'A public registry for reef corals. Log specimens, trace frags back to the mother colony, and give every coral a permanent, shareable page.',
+    'A public registry for reef corals. Every specimen carries an RF code, a photo history and a verified parent. Log yours, pass frags, and the lineage builds itself.',
   alternates: { canonical: BASE },
   openGraph: {
     title: 'Coral Chest — trace the lineage of every coral',
     description:
-      'Log specimens, trace frags back to the mother colony, and give every coral a permanent, shareable page.',
+      'Every specimen carries an RF code, a photo history and a verified parent. Log yours, pass frags, and the lineage builds itself.',
     url: BASE,
     type: 'website',
   },
 };
 
+function ago(iso: string) {
+  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  return `${Math.floor(h / 24)}d`;
+}
+
+function eventLabel(kind: string) {
+  if (kind === 'lineage') return 'Frag cut and passed to a new keeper';
+  if (kind === 'listing') return 'Frag listed for sale';
+  return 'New specimen logged';
+}
+
 export default async function LandingPage() {
-  // Internal links are how a crawler reaches /coral/* at all. Without them the
-  // sitemap lists orphan URLs with no path in from anywhere.
-  let recent: Awaited<ReturnType<typeof getExploreSpecimens>> = [];
-  try {
-    recent = (await getExploreSpecimens()).slice(0, 12);
-  } catch {
-    // Landing page must render even if the database is unreachable.
-  }
+  // Every query is wrapped — this is the crawlable entry point and must render
+  // even if the database is unreachable.
+  const [specimens, stats, chain, keepers, activity] = await Promise.all([
+    getExploreSpecimens().then((r) => r.slice(0, 8)).catch(() => []),
+    getHomeStats().catch(() => ({ specimens: 0, chains: 0, keepers: 0, farms: 0, loggedToday: 0 })),
+    getDeepestChain().catch(() => null),
+    getTopKeepers(5).catch(() => []),
+    getFeedItems(6).catch(() => []),
+  ]);
 
   return (
-    <Box style={{ minHeight: '100vh', background: 'var(--mantine-color-body)' }}>
-      {/* Top bar */}
-      <Box style={{ borderBottom: '1px solid var(--mantine-color-default-border)', padding: '14px 24px' }}>
-        <Group justify="space-between" align="center">
-          <Group gap={8} align="center">
-            <Box style={{
-              width: 26, height: 26, borderRadius: 6, flexShrink: 0,
-              background: 'linear-gradient(135deg, oklch(0.65 0.20 40), oklch(0.48 0.20 250))',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <IconSeeding size={13} stroke={2.2} color="#fff" />
-            </Box>
-            <Text style={{ fontFamily: 'var(--font-sora)', fontWeight: 700, fontSize: 16 }}>
-              Coral Chest
-            </Text>
-          </Group>
-          <Group gap="xs">
-            <Button component="a" href="/sign-in" variant="default" size="xs">Sign in</Button>
-            <Button component="a" href="/sign-up" size="xs">Join free</Button>
-          </Group>
-        </Group>
-      </Box>
+    <div className={styles.page}>
+      <header className={styles.header}>
+        <Link href="/" className={styles.brand}>
+          <span className={styles.brandMark}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round">
+              <path d="M12 21V9" /><path d="M12 13c0-3 2.5-5 5-5" />
+              <path d="M12 15c0-3-2.5-5-5-5" /><path d="M5 21h14" />
+            </svg>
+          </span>
+          <span className={styles.brandName}>Coral Chest</span>
+        </Link>
 
-      {/* Hero */}
-      <Box style={{
-        background: 'linear-gradient(150deg, oklch(0.22 0.08 30) 0%, oklch(0.17 0.06 240) 100%)',
-        padding: '100px 24px 88px',
-        textAlign: 'center',
-      }}>
-        <Stack gap="lg" align="center" maw={580} mx="auto">
-          <Text
-            component="h1"
-            style={{
-              fontFamily: 'var(--font-sora)',
-              fontWeight: 800,
-              fontSize: 'clamp(32px, 6vw, 54px)',
-              color: '#fff',
-              margin: 0,
-              lineHeight: 1.1,
-              letterSpacing: '-0.02em',
-            }}
-          >
-            Every coral has a story.
-            <br />
-            <span style={{ color: 'oklch(0.80 0.16 55)' }}>Trace it.</span>
-          </Text>
-          <Text style={{ color: 'rgba(255,255,255,0.60)', fontSize: 17, lineHeight: 1.65, maxWidth: 440 }}>
-            The collector's log for reef hobbyists. Log specimens, record their lineage, and share your chest with the hobby.
-          </Text>
-          <Group gap="sm" mt={8}>
-            <Button component="a" href="/sign-up" size="md" variant="white" color="dark" radius="md">
-                Start your chest →
-              </Button>
-            <Button component="a" href="/explore" size="md" variant="outline" radius="md"
-                style={{ color: 'rgba(255,255,255,0.75)', borderColor: 'rgba(255,255,255,0.25)' }}>
-                Browse specimens
-              </Button>
-          </Group>
-        </Stack>
-      </Box>
+        <nav className={styles.nav}>
+          <Link href="/explore" className={styles.navLink}>Explore</Link>
+          <Link href="/explore" className={styles.navLink}>Lineage</Link>
+          <Link href="/explore" className={styles.navLink}>Farms</Link>
+        </nav>
 
-      {/* Features */}
-      <Box maw={820} mx="auto" px="xl" py={80}>
-        <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="xl">
-          {[
-            {
-              icon: IconSeeding,
-              hue: 200,
-              title: 'Log',
-              body: 'Add every specimen with photos, species, origin, and a unique RF code printed right on the tag.',
-            },
-            {
-              icon: IconArrowsShuffle,
-              hue: 160,
-              title: 'Trace',
-              body: 'Pass frags and watch the lineage build automatically. Every child knows its parent.',
-            },
-            {
-              icon: IconShare3,
-              hue: 40,
-              title: 'Share',
-              body: 'Every specimen gets a public page with full SEO. Share the link — no account needed to view.',
-            },
-          ].map(({ icon: Icon, hue, title, body }) => (
-            <Stack key={title} gap={12} align="center" style={{ textAlign: 'center' }}>
-              <Box style={{
-                width: 48, height: 48, borderRadius: 14,
-                background: `oklch(0.95 0.04 ${hue})`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <Icon size={22} color={`oklch(0.45 0.18 ${hue})`} />
-              </Box>
-              <Text fw={700} style={{ fontFamily: 'var(--font-sora)', fontSize: 16 }}>{title}</Text>
-              <Text size="sm" c="dimmed" style={{ lineHeight: 1.65 }}>{body}</Text>
-            </Stack>
-          ))}
-        </SimpleGrid>
-      </Box>
+        <div className={styles.searchWrap}>
+          <form action="/explore" className={styles.searchInner}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#848d9b" strokeWidth="2.4" className={styles.searchIcon}>
+              <circle cx="11" cy="11" r="7.5" /><path d="m21 21-4.3-4.3" />
+            </svg>
+            <input
+              name="q"
+              className={styles.search}
+              placeholder="Search a name, species, or RF code"
+              aria-label="Search corals"
+            />
+          </form>
+        </div>
 
-      {/* What is a Coral Chest */}
-      <Box style={{ background: 'var(--mantine-color-default)', borderTop: '1px solid var(--mantine-color-default-border)', borderBottom: '1px solid var(--mantine-color-default-border)' }}>
-        <Box maw={640} mx="auto" px="xl" py={72} style={{ textAlign: 'center' }}>
-          <Text
-            component="h2"
-            style={{ fontFamily: 'var(--font-sora)', fontWeight: 700, fontSize: 24, margin: '0 0 16px', lineHeight: 1.2 }}
-          >
-            What&apos;s a Coral Chest?
-          </Text>
-          <Text c="dimmed" style={{ lineHeight: 1.75, fontSize: 15 }}>
-            Think of it as a digital cabinet of curiosities for your reef. Every coral you add gets a unique RF code.
-            Pass frags to other hobbyists — the lineage follows automatically. Years from now, every specimen in
-            the hobby can trace itself back to its origin.
-          </Text>
-        </Box>
-      </Box>
+        <div className={styles.headerCtas}>
+          <Link href="/sign-in" className={styles.act}>Sign in</Link>
+          <Link href="/sign-up" className={styles.pri}>Join free</Link>
+        </div>
+      </header>
 
-      {/* Recently logged — the crawl path into individual coral pages */}
-      {recent.length > 0 && (
-        <Box maw={900} mx="auto" px="xl" py={64}>
-          <Text
-            component="h2"
-            style={{ fontFamily: 'var(--font-sora)', fontWeight: 700, fontSize: 22, margin: '0 0 6px', textAlign: 'center' }}
-          >
-            Recently logged corals
-          </Text>
-          <Text c="dimmed" size="sm" style={{ textAlign: 'center', marginBottom: 24 }}>
-            Every specimen gets its own page — no account needed to view.
-          </Text>
-          <Group gap={8} justify="center">
-            {recent.map((c) => (
-              <Link
-                key={c.id}
-                href={`/coral/${c.rfCode ?? c.id}`}
-                style={{
-                  textDecoration: 'none', color: 'inherit',
-                  border: '1px solid var(--mantine-color-default-border)',
-                  borderRadius: 999, padding: '6px 14px', fontSize: 13, fontWeight: 600,
-                }}
-              >
-                {c.name}
-                {c.species && <Text span c="dimmed" fw={400} fs="italic"> · {c.species}</Text>}
-              </Link>
+      <section className={styles.hero}>
+        <div>
+          <div className={styles.livePill}>
+            <span className={styles.liveDot} />
+            {stats.loggedToday} specimen{stats.loggedToday !== 1 ? 's' : ''} logged in the last 24 hours
+          </div>
+          <h1 className={styles.h1}>The collector&apos;s log for reef hobbyists</h1>
+          <p className={styles.lede}>
+            Every specimen carries an RF code, a photo history and a verified parent.
+            Log yours, pass frags, and the lineage builds itself.
+          </p>
+          <div className={styles.heroCtas}>
+            <Link href="/sign-up" className={styles.ctaPri}>Start your chest</Link>
+            <Link href="/explore" className={styles.ctaAct}>Browse specimens</Link>
+          </div>
+
+          <div className={styles.heroStats}>
+            {[
+              { v: stats.specimens, k: 'Specimens' },
+              { v: stats.chains, k: 'Chains' },
+              { v: stats.keepers, k: 'Keepers' },
+              { v: stats.farms, k: 'Farms' },
+            ].map((s) => (
+              <div key={s.k} className={styles.heroStat}>
+                <div className={styles.heroStatNum}>{s.v.toLocaleString()}</div>
+                <div className={styles.heroStatKey}>{s.k}</div>
+              </div>
             ))}
-          </Group>
-          <Text style={{ textAlign: 'center', marginTop: 20 }}>
-            <Link href="/explore" style={{ color: 'var(--mantine-primary-color-filled)', textDecoration: 'none', fontSize: 14, fontWeight: 600 }}>
-              Browse all specimens →
-            </Link>
-          </Text>
-        </Box>
+          </div>
+        </div>
+
+        {chain && (
+          <div className={styles.chainCard}>
+            <div className={styles.chainHead}>
+              <span className={styles.kicker}>Deepest chain right now</span>
+              <Link href={`/coral/${chain.tipRfCode ?? chain.tipId}`} className={styles.link}>Open</Link>
+            </div>
+            <div className={styles.chainBody}>
+              <div className={styles.chainTop}>
+                <div
+                  className={styles.chainThumb}
+                  style={{ background: coralIdentityGradient(chain.tipRfCode ?? chain.tipId) }}
+                />
+                <div style={{ minWidth: 0 }}>
+                  <div className={styles.chainName}>{chain.name}</div>
+                  {chain.species && <div className={styles.chainSpecies}>{chain.species}</div>}
+                  <div className={styles.chainSpan}>
+                    {chain.rootRfCode ?? 'origin'} → {chain.tipRfCode ?? 'tip'}
+                  </div>
+                </div>
+              </div>
+
+              {/* One segment per generation in the chain, the last one lit. */}
+              <div className={styles.chainDots}>
+                {(() => {
+                  const segments = Math.max(chain.depth + 1, 4);
+                  return Array.from({ length: segments }, (_, i) => (
+                    <span
+                      key={i}
+                      className={`${styles.chainDot} ${i === segments - 1 ? styles.chainDotLast : ''}`}
+                    />
+                  ));
+                })()}
+              </div>
+
+              <div className={styles.chainMeta}>
+                <span>{chain.origin ?? 'Origin unrecorded'}</span>
+                <span>Gen {chain.depth}</span>
+              </div>
+
+              <div className={styles.chainStats}>
+                {[
+                  { v: chain.depth, k: 'Gens' },
+                  { v: stats.chains, k: 'Frags' },
+                  { v: stats.keepers, k: 'Keepers' },
+                ].map((s) => (
+                  <div key={s.k} className={styles.chainStat}>
+                    <div className={styles.chainStatNum}>{s.v}</div>
+                    <div className={styles.chainStatKey}>{s.k}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {specimens.length > 0 && (
+        <section className={styles.section}>
+          <HomeSpecimens
+            specimens={specimens.map((s) => ({
+              id: s.id,
+              name: s.name,
+              species: s.species,
+              category: s.category,
+              rfCode: s.rfCode,
+              coverPhotoUrl: s.coverPhotoUrl,
+              ownerUsername: s.ownerUsername,
+              createdAt: s.createdAt,
+            }))}
+          />
+        </section>
       )}
 
-      {/* Bottom CTA */}
-      <Box style={{ textAlign: 'center', padding: '72px 24px' }}>
-        <Stack gap="md" align="center">
-          <Text
-            component="h2"
-            style={{ fontFamily: 'var(--font-sora)', fontWeight: 700, fontSize: 22, margin: 0 }}
-          >
-            Start your chest — it&apos;s free.
-          </Text>
-          <Text c="dimmed" size="sm">No credit card. No catch. Just your collection.</Text>
-          <Button component="a" href="/sign-up" size="md" radius="md">Create account →</Button>
-        </Stack>
-      </Box>
+      <section className={styles.split}>
+        <div>
+          <div className={styles.sectionHead}>
+            <h2 className={styles.h2}>Lineage activity</h2>
+            <Link href="/explore" className={styles.link}>All chains</Link>
+          </div>
+          <div className={styles.panel}>
+            {activity.length === 0 ? (
+              <p className={styles.empty}>No activity yet.</p>
+            ) : (
+              activity.map((a) => (
+                <Link
+                  key={a.id}
+                  href={a.specimenId ? `/coral/${a.specimenRfCode ?? a.specimenId}` : '/explore'}
+                  className={styles.linRow}
+                >
+                  <span className={`${styles.linCode} ${styles.mono}`}>{a.specimenRfCode ?? '—'}</span>
+                  <span className={styles.linEvent}>{eventLabel(a.kind)}</span>
+                  <span className={styles.linWho}>@{a.actorUsername}</span>
+                  <span className={styles.linAgo}>{ago(a.createdAt)}</span>
+                </Link>
+              ))
+            )}
+          </div>
+        </div>
 
-      {/* Footer */}
-      <Box style={{ borderTop: '1px solid var(--mantine-color-default-border)', padding: '20px 24px', textAlign: 'center' }}>
-        <Text size="xs" c="dimmed">
-          © {new Date().getFullYear()} Coral Chest · Free for hobbyists
-        </Text>
-      </Box>
-    </Box>
+        <div>
+          <div className={styles.sectionHead}>
+            <h2 className={styles.h2}>Top keepers</h2>
+            <span className={styles.sub}>by frags traced</span>
+          </div>
+          <div className={styles.panel}>
+            {keepers.length === 0 ? (
+              <p className={styles.empty}>No keepers yet.</p>
+            ) : (
+              keepers.map((k, i) => (
+                <Link key={k.username} href={`/users/${k.username}`} className={styles.keeperRow}>
+                  <span className={styles.rank}>{i + 1}</span>
+                  <span className={styles.avLg}>{k.username.charAt(0).toUpperCase()}</span>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div className={styles.keeperHandle}>@{k.username}</div>
+                    <div className={styles.keeperSub}>
+                      {k.corals} specimen{k.corals !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                  <span className={styles.keeperFrags}>{k.frags}</span>
+                </Link>
+              ))
+            )}
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }
