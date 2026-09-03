@@ -6,6 +6,7 @@ import { getCurrentUser } from '@/lib/getCurrentUser';
 import { uniqueRFCode } from '@/lib/rfCode';
 import { createNotification } from '@/app/actions/notifications';
 import { checkSpecimenCap } from '@/lib/entitlements';
+import { invariant } from '@/lib/log';
 
 export type LineageNode = {
   id: string;
@@ -119,7 +120,18 @@ export async function claimFrag(rfCode: string): Promise<{ coralId: string; cora
     `SELECT id, name, species, category, "ownerId" FROM public."Coral" WHERE "rfCode" = $1 AND "ownerId" IS NOT NULL`,
     [normalized]
   );
-  if (!parentRows[0]) return { error: 'No coral found with that RF code' };
+  if (!parentRows[0]) {
+    // Neither branch matched. Usually a typo'd code — but if the code DOES exist
+    // in Coral, the two branch queries disagree with reality and that is a bug.
+    const { rows: exists } = await pool.query<{ n: number }>(
+      'SELECT COUNT(*)::int AS n FROM public."Coral" WHERE "rfCode" = $1',
+      [normalized]
+    );
+    invariant('claim.code_exists_but_no_branch_matched', exists[0].n === 0, {
+      rfCode: normalized,
+    });
+    return { error: 'No coral found with that RF code' };
+  }
 
   const parent = parentRows[0];
   if (parent.ownerId === user.id) {

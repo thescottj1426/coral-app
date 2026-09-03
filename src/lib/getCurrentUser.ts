@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { auth } from './auth';
 import { pool } from './db';
 import { FREE_CAP_ENABLED_AT, type Plan } from './entitlements';
+import { invariant, maskEmail } from './log';
 
 type UserRow = { id: string; plan: Plan; capExempt: boolean };
 
@@ -38,6 +39,10 @@ export async function getCurrentUser() {
      ON CONFLICT DO NOTHING`,
     [session.user.id, session.user.id, fallbackUsername, session.user.email]
   ).catch(() => {});
+
+  // Reaching here means an authenticated session had no User row — a real
+  // inconsistency, not a normal path. Report it even though we recover.
+  invariant('user.self_heal_triggered', false, { email: maskEmail(session.user.email) });
 
   // Re-read so every caller gets the same shape, always carrying a real User.id.
   const { rows: healed } = await pool.query<UserRow>(SELECT_USER, [session.user.email, FREE_CAP_ENABLED_AT]);

@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { pool } from '@/lib/db';
 import { auth } from '@/lib/auth';
+import { invariant } from '@/lib/log';
 import type { SpecimenRow } from './specimens';
 
 export type UserProfile = {
@@ -202,7 +203,16 @@ export async function updateProfile(data: UpdateProfileData): Promise<void> {
   }
 
   if (!setClauses.length) return;
-  await pool.query(`UPDATE public."User" SET ${setClauses.join(', ')} WHERE id = $1`, params);
+  const res = await pool.query(`UPDATE public."User" SET ${setClauses.join(', ')} WHERE id = $1`, params);
+
+  // Matches session.user.id against User.id. For accounts migrated from the old
+  // auth system those differ, so this silently updates nothing — the exact bug
+  // getCurrentUser exists to work around. Report it rather than failing quietly.
+  invariant('profile.update_matched_no_rows', res.rowCount === 1, {
+    userId,
+    rowCount: res.rowCount ?? -1,
+  });
+
   revalidatePath(`/users/${session.user.name}`);
 }
 

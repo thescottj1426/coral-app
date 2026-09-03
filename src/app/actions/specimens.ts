@@ -7,6 +7,7 @@ import { sendEmail } from '@/lib/email';
 import { welcomeTemplate } from '@/lib/emailTemplates';
 import { uniqueRFCode } from '@/lib/rfCode';
 import { checkSpecimenCap } from '@/lib/entitlements';
+import { invariant } from '@/lib/log';
 
 export type SpecimenRow = {
   id: string;
@@ -165,7 +166,22 @@ export async function getPublicSpecimen(rfCodeOrId: string): Promise<SpecimenDet
      LIMIT 1`,
     [rfCodeOrId]
   );
-  return rows[0] ?? null;
+
+  if (!rows[0]) {
+    // This returning null 404s the public page. If the code exists in Coral,
+    // the query is dropping a real row — which is exactly how unclaimed frags
+    // were invisible for weeks (inner join on a NULL owner).
+    const { rows: exists } = await pool.query<{ n: number }>(
+      'SELECT COUNT(*)::int AS n FROM public."Coral" WHERE "rfCode" = $1 OR id = $1',
+      [rfCodeOrId]
+    );
+    invariant('public_specimen.exists_but_query_returned_null', exists[0].n === 0, {
+      rfCodeOrId,
+    });
+    return null;
+  }
+
+  return rows[0];
 }
 
 export async function getSpecimen(rfCodeOrId: string): Promise<SpecimenDetail | null> {

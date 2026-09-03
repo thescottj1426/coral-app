@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import * as log from './log';
 
 // Update FROM once you have coralchest.com verified in Resend.
 // onboarding@resend.dev is Resend's sandbox sender — it ONLY delivers to the
@@ -18,30 +19,40 @@ export type SendResult = { ok: true } | { ok: false; error: string };
 const EMAILS_PAUSED = process.env.EMAILS_ENABLED !== 'true';
 
 export async function sendEmail(to: string, subject: string, html: string): Promise<SendResult> {
+  // Recipients are masked throughout — enough to correlate a user, not enough
+  // to leave PII sitting in a log store.
+  const recipient = log.maskEmail(to);
+
   if (EMAILS_PAUSED) {
-    console.log(`[email] PAUSED — would have sent to ${to} ("${subject}")`);
+    log.warn('email.paused', { recipient, subject });
     return { ok: true };
   }
 
   if (!resend) {
     const error = 'RESEND_API_KEY is not set — no email was sent';
-    console.error(`[email] FAILED to ${to} ("${subject}"): ${error}`);
+    log.error('email.send_failed', { recipient, subject, reason: 'missing_api_key' });
     return { ok: false, error };
   }
 
   if (FROM.includes(SANDBOX_FROM)) {
-    console.warn(
-      `[email] FROM is the Resend sandbox sender (${FROM}). Delivery to ${to} will be ` +
-      `rejected unless it owns the Resend account. Set RESEND_FROM to a verified domain.`
-    );
+    log.warn('email.sandbox_sender', {
+      recipient,
+      from: FROM,
+      detail: 'Sandbox sender only delivers to the Resend account owner. Set RESEND_FROM to a verified domain.',
+    });
   }
 
   const { error } = await resend.emails.send({ from: FROM, to, subject, html });
   if (error) {
-    console.error(`[email] FAILED to ${to} from ${FROM} ("${subject}"):`, error);
+    log.error('email.send_failed', {
+      recipient,
+      subject,
+      from: FROM,
+      reason: error.message ?? 'rejected',
+    });
     return { ok: false, error: error.message ?? 'Resend rejected the message' };
   }
 
-  console.log(`[email] sent to ${to} from ${FROM} ("${subject}")`);
+  log.event('email.sent', { recipient, subject, from: FROM });
   return { ok: true };
 }
