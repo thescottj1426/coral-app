@@ -1,8 +1,39 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Box, Group, Stack, Text, Button, SimpleGrid } from '@mantine/core';
 import { IconSeeding, IconArrowsShuffle, IconShare3 } from '@tabler/icons-react';
+import { getExploreSpecimens } from '@/app/actions/explore';
+import { siteUrl } from '@/lib/siteUrl';
 
-export default function LandingPage() {
+const BASE = siteUrl();
+
+// Rebuilt hourly so newly added corals appear as crawlable links.
+export const revalidate = 3600;
+
+export const metadata: Metadata = {
+  title: 'Coral Chest — trace the lineage of every coral',
+  description:
+    'A public registry for reef corals. Log specimens, trace frags back to the mother colony, and give every coral a permanent, shareable page.',
+  alternates: { canonical: BASE },
+  openGraph: {
+    title: 'Coral Chest — trace the lineage of every coral',
+    description:
+      'Log specimens, trace frags back to the mother colony, and give every coral a permanent, shareable page.',
+    url: BASE,
+    type: 'website',
+  },
+};
+
+export default async function LandingPage() {
+  // Internal links are how a crawler reaches /coral/* at all. Without them the
+  // sitemap lists orphan URLs with no path in from anywhere.
+  let recent: Awaited<ReturnType<typeof getExploreSpecimens>> = [];
+  try {
+    recent = (await getExploreSpecimens()).slice(0, 12);
+  } catch {
+    // Landing page must render even if the database is unreachable.
+  }
+
   return (
     <Box style={{ minHeight: '100vh', background: 'var(--mantine-color-body)' }}>
       {/* Top bar */}
@@ -21,12 +52,8 @@ export default function LandingPage() {
             </Text>
           </Group>
           <Group gap="xs">
-            <Link href="/sign-in" style={{ textDecoration: 'none' }}>
-              <Button component="a" variant="default" size="xs">Sign in</Button>
-            </Link>
-            <Link href="/sign-up" style={{ textDecoration: 'none' }}>
-              <Button component="a" size="xs">Join free</Button>
-            </Link>
+            <Button component="a" href="/sign-in" variant="default" size="xs">Sign in</Button>
+            <Button component="a" href="/sign-up" size="xs">Join free</Button>
           </Group>
         </Group>
       </Box>
@@ -58,17 +85,13 @@ export default function LandingPage() {
             The collector's log for reef hobbyists. Log specimens, record their lineage, and share your chest with the hobby.
           </Text>
           <Group gap="sm" mt={8}>
-            <Link href="/sign-up" style={{ textDecoration: 'none' }}>
-              <Button component="a" size="md" variant="white" color="dark" radius="md">
+            <Button component="a" href="/sign-up" size="md" variant="white" color="dark" radius="md">
                 Start your chest →
               </Button>
-            </Link>
-            <Link href="/explore" style={{ textDecoration: 'none' }}>
-              <Button component="a" size="md" variant="outline" radius="md"
+            <Button component="a" href="/explore" size="md" variant="outline" radius="md"
                 style={{ color: 'rgba(255,255,255,0.75)', borderColor: 'rgba(255,255,255,0.25)' }}>
                 Browse specimens
               </Button>
-            </Link>
           </Group>
         </Stack>
       </Box>
@@ -128,6 +151,42 @@ export default function LandingPage() {
         </Box>
       </Box>
 
+      {/* Recently logged — the crawl path into individual coral pages */}
+      {recent.length > 0 && (
+        <Box maw={900} mx="auto" px="xl" py={64}>
+          <Text
+            component="h2"
+            style={{ fontFamily: 'var(--font-sora)', fontWeight: 700, fontSize: 22, margin: '0 0 6px', textAlign: 'center' }}
+          >
+            Recently logged corals
+          </Text>
+          <Text c="dimmed" size="sm" style={{ textAlign: 'center', marginBottom: 24 }}>
+            Every specimen gets its own page — no account needed to view.
+          </Text>
+          <Group gap={8} justify="center">
+            {recent.map((c) => (
+              <Link
+                key={c.id}
+                href={`/coral/${c.rfCode ?? c.id}`}
+                style={{
+                  textDecoration: 'none', color: 'inherit',
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 999, padding: '6px 14px', fontSize: 13, fontWeight: 600,
+                }}
+              >
+                {c.name}
+                {c.species && <Text span c="dimmed" fw={400} fs="italic"> · {c.species}</Text>}
+              </Link>
+            ))}
+          </Group>
+          <Text style={{ textAlign: 'center', marginTop: 20 }}>
+            <Link href="/explore" style={{ color: 'var(--mantine-primary-color-filled)', textDecoration: 'none', fontSize: 14, fontWeight: 600 }}>
+              Browse all specimens →
+            </Link>
+          </Text>
+        </Box>
+      )}
+
       {/* Bottom CTA */}
       <Box style={{ textAlign: 'center', padding: '72px 24px' }}>
         <Stack gap="md" align="center">
@@ -138,9 +197,7 @@ export default function LandingPage() {
             Start your chest — it&apos;s free.
           </Text>
           <Text c="dimmed" size="sm">No credit card. No catch. Just your collection.</Text>
-          <Link href="/sign-up" style={{ textDecoration: 'none' }}>
-            <Button component="a" size="md" radius="md">Create account →</Button>
-          </Link>
+          <Button component="a" href="/sign-up" size="md" radius="md">Create account →</Button>
         </Stack>
       </Box>
 

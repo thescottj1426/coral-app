@@ -14,11 +14,15 @@ import {
   Badge,
   ScrollArea,
   Loader,
+  Select,
+  Checkbox,
 } from '@mantine/core';
 import { IconCopy, IconCheck, IconLeaf, IconScissors, IconPlus, IconLink } from '@tabler/icons-react';
 import { useState, useTransition } from 'react';
 import { CoralThumb } from './CoralThumb';
 import { createFrags } from '@/app/actions/lineage';
+import { CORAL_STAGES } from '@/components/specimen/AddSpecimenDrawer';
+import type { CoralStage } from '@/app/actions/specimens';
 
 const EYEBROW: React.CSSProperties = {
   fontFamily: 'var(--font-ibm-plex-mono), monospace',
@@ -41,11 +45,13 @@ export interface FragModalProps {
 export function FragModal({ opened, onClose, parentId, parentRfCode, parentName, parentGeneration }: FragModalProps) {
   const newGeneration = parentGeneration + 1;
   const [codes, setCodes] = useState<string[]>([]);
+  const [stage, setStage] = useState<CoralStage>('FRAG');
+  const [keepForSelf, setKeepForSelf] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   function addFrag() {
     startTransition(async () => {
-      const newCodes = await createFrags(parentId, 1);
+      const newCodes = await createFrags(parentId, 1, { stage, keepForSelf });
       setCodes((prev) => [...prev, ...newCodes]);
     });
   }
@@ -193,6 +199,24 @@ export function FragModal({ opened, onClose, parentId, parentRfCode, parentName,
           )}
         </Stack>
 
+        {/* What is being cut, and whether it stays with you */}
+        <Stack gap="sm">
+          <Select
+            label="What are you cutting off?"
+            data={CORAL_STAGES.map(o => ({ value: o.value, label: o.label }))}
+            value={stage}
+            onChange={(v) => v && setStage(v as CoralStage)}
+            allowDeselect={false}
+            size="sm"
+          />
+          <Checkbox
+            label="Keep this one — add it straight to my collection"
+            description="Skips the claim step. Use when you are fragging to grow out yourself."
+            checked={keepForSelf}
+            onChange={(e) => setKeepForSelf(e.currentTarget.checked)}
+          />
+        </Stack>
+
         {/* Add frag */}
         <Button
           variant="light"
@@ -201,7 +225,7 @@ export function FragModal({ opened, onClose, parentId, parentRfCode, parentName,
           loading={isPending}
           fullWidth
         >
-          Log a frag
+          {keepForSelf ? 'Log a frag and keep it' : 'Log a frag'}
         </Button>
 
         <Divider />

@@ -6,6 +6,7 @@ import { getCurrentUser } from '@/lib/getCurrentUser';
 import { uniqueRFCode } from '@/lib/rfCode';
 import { createNotification } from '@/app/actions/notifications';
 import { checkSpecimenCap } from '@/lib/entitlements';
+import type { CoralStage } from '@/app/actions/specimens';
 import { invariant } from '@/lib/log';
 
 export type LineageNode = {
@@ -15,21 +16,24 @@ export type LineageNode = {
   identityHue: number | null;
   ownerUsername: string | null;
   depth: number;
+  generationFromMother: number | null;
+  parentStageAtCut: CoralStage | null;
 };
 
 export async function getLineage(specimenId: string): Promise<LineageNode[]> {
   const { rows } = await pool.query<LineageNode>(
     `WITH RECURSIVE chain AS (
-       SELECT "parentId", "childId", 1 AS depth
+       SELECT "parentId", "childId", 1 AS depth, "parentStageAtCut"
        FROM public."Lineage"
        WHERE "childId" = $1
        UNION ALL
-       SELECT l."parentId", l."childId", chain.depth + 1
+       SELECT l."parentId", l."childId", chain.depth + 1, l."parentStageAtCut"
        FROM public."Lineage" l
        JOIN chain ON l."childId" = chain."parentId"
-       WHERE chain.depth < 4
+       WHERE chain.depth < 20
      )
-     SELECT c.id, c.name, c."rfCode", c."identityHue", u.username AS "ownerUsername", chain.depth
+     SELECT c.id, c.name, c."rfCode", c."identityHue", u.username AS "ownerUsername", chain.depth,
+            c."generationFromMother", chain."parentStageAtCut"
      FROM chain
      JOIN public."Coral" c ON c.id = chain."parentId"
      LEFT JOIN public."User" u ON u.id = c."ownerId"
@@ -41,7 +45,8 @@ export async function getLineage(specimenId: string): Promise<LineageNode[]> {
 
 export async function getChildren(specimenId: string): Promise<LineageNode[]> {
   const { rows } = await pool.query<LineageNode>(
-    `SELECT c.id, c.name, c."rfCode", c."identityHue", u.username AS "ownerUsername", 1 AS depth
+    `SELECT c.id, c.name, c."rfCode", c."identityHue", u.username AS "ownerUsername", 1 AS depth,
+            c."generationFromMother", l."parentStageAtCut"
      FROM public."Lineage" l
      JOIN public."Coral" c ON c.id = l."childId"
      LEFT JOIN public."User" u ON u.id = c."ownerId"
@@ -105,7 +110,11 @@ export async function claimFrag(rfCode: string): Promise<{ coralId: string; cora
 
   if (fragRows[0]) {
     await pool.query(
-      `UPDATE public."Coral" SET "ownerId" = $1, "updatedAt" = NOW() WHERE id = $2`,
+      `UPDATE public."Coral"
+         SET "ownerId" = $1,
+             "acquiredStage" = COALESCE("acquiredStage", stage),
+             "updatedAt" = NOW()
+       WHERE id = $2`,
       [user.id, fragRows[0].id]
     );
     revalidatePath('/collection');
@@ -115,9 +124,9 @@ export async function claimFrag(rfCode: string): Promise<{ coralId: string; cora
 
   // Otherwise treat as a parent coral and create a child
   const { rows: parentRows } = await pool.query<{
-    id: string; name: string; species: string | null; category: string | null; ownerId: string;
+    id: string; name: string; species: string | null; category: string | null; ownerId: string; stage: CoralStage | null;
   }>(
-    `SELECT id, name, species, category, "ownerId" FROM public."Coral" WHERE "rfCode" = $1 AND "ownerId" IS NOT NULL`,
+    `SELECT id, name, species, category, "ownerId", stage FROM public."Coral" WHERE "rfCode" = $1 AND "ownerId" IS NOT NULL`,
     [normalized]
   );
   if (!parentRows[0]) {
@@ -143,16 +152,19 @@ export async function claimFrag(rfCode: string): Promise<{ coralId: string; cora
 
   const { rows: childRows } = await pool.query<{ id: string; rfCode: string }>(
     `INSERT INTO public."Coral"
-       (id, name, species, category, "rfCode", "ownerId", "identityHue", "updatedAt")
-     VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, NOW())
+       (id, name, species, category, "rfCode", "ownerId", "identityHue",
+        stage, "acquiredStage", "updatedAt")
+     VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6,
+             'FRAG'::"CoralStage", 'FRAG'::"CoralStage", NOW())
      RETURNING id, "rfCode"`,
     [parent.name, parent.species ?? null, parent.category ?? null, newRfCode, user.id, identityHue]
   );
   const child = childRows[0];
 
   await pool.query(
-    `INSERT INTO public."Lineage" ("parentId", "childId") VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-    [parent.id, child.id]
+    `INSERT INTO public."Lineage" ("parentId", "childId", "parentStageAtCut")
+     VALUES ($1, $2, $3::"CoralStage") ON CONFLICT DO NOTHING`,
+    [parent.id, child.id, parent.stage]
   );
 
   createNotification({
@@ -170,16 +182,27 @@ export async function claimFrag(rfCode: string): Promise<{ coralId: string; cora
 
 // Creates unclaimed child corals (ownerId=NULL) linked to parentId.
 // Called from FragModal — each code is a real DB record the recipient can claim.
-export async function createFrags(parentId: string, count: number): Promise<string[]> {
+export async function createFrags(
+  parentId: string,
+  count: number,
+  opts?: { stage?: CoralStage; keepForSelf?: boolean }
+): Promise<string[]> {
   const user = await getCurrentUser();
 
-  const { rows: parentRows } = await pool.query<{ name: string; species: string | null; category: string | null }>(
-    'SELECT name, species, category FROM public."Coral" WHERE id = $1 AND "ownerId" = $2',
+  const { rows: parentRows } = await pool.query<{
+    name: string; species: string | null; category: string | null; stage: CoralStage | null;
+  }>(
+    'SELECT name, species, category, stage FROM public."Coral" WHERE id = $1 AND "ownerId" = $2',
     [parentId, user.id]
   );
   if (!parentRows[0]) throw new Error('Coral not found or not owned by you');
 
   const parent = parentRows[0];
+  const fragStage: CoralStage = opts?.stage ?? 'FRAG';
+  // "Keep this one" — assign straight to the owner so cutting a frag off your
+  // own frag doesn't require a self-claim detour through /claim.
+  const ownerId = opts?.keepForSelf ? user.id : null;
+
   const codes: string[] = [];
   const n = Math.min(Math.max(1, Math.floor(count)), 25);
 
@@ -189,20 +212,29 @@ export async function createFrags(parentId: string, count: number): Promise<stri
 
     const { rows } = await pool.query<{ id: string }>(
       `INSERT INTO public."Coral"
-         (id, name, species, category, "rfCode", "ownerId", "identityHue", "updatedAt")
-       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, NULL, $5, NOW())
+         (id, name, species, category, "rfCode", "ownerId", "identityHue",
+          stage, "acquiredStage", "updatedAt")
+       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6,
+               $7::"CoralStage", $8::"CoralStage", NOW())
        RETURNING id`,
-      [parent.name, parent.species ?? null, parent.category ?? null, rfCode, identityHue]
+      [
+        parent.name, parent.species ?? null, parent.category ?? null, rfCode, ownerId, identityHue,
+        fragStage,
+        // Only meaningful once someone owns it; set on claim otherwise.
+        ownerId ? fragStage : null,
+      ]
     );
 
     await pool.query(
-      'INSERT INTO public."Lineage" ("parentId", "childId") VALUES ($1, $2) ON CONFLICT DO NOTHING',
-      [parentId, rows[0].id]
+      `INSERT INTO public."Lineage" ("parentId", "childId", "parentStageAtCut")
+       VALUES ($1, $2, $3::"CoralStage") ON CONFLICT DO NOTHING`,
+      [parentId, rows[0].id, parent.stage]
     );
 
     codes.push(rfCode);
   }
 
+  if (opts?.keepForSelf) revalidatePath('/collection');
   return codes;
 }
 
@@ -224,11 +256,30 @@ export async function claimParent(childId: string, parentRfCode: string): Promis
   const parentId = parentRows[0].id as string;
   if (parentId === childId) return { error: 'A specimen cannot be its own parent' };
 
+  // A frag is cut from exactly one colony, enforced by UNIQUE("childId").
+  // Check first so the user gets a real message rather than a silent no-op —
+  // ON CONFLICT DO NOTHING would swallow this and report success.
+  const { rows: existing } = await pool.query<{ parentId: string }>(
+    'SELECT "parentId" FROM public."Lineage" WHERE "childId" = $1',
+    [childId]
+  );
+  if (existing[0]) {
+    return existing[0].parentId === parentId
+      ? { error: 'That parent is already linked to this specimen' }
+      : { error: 'This specimen already has a parent. Remove it before linking a different one.' };
+  }
+
   try {
-    await pool.query(
+    // parentStageAtCut is deliberately left null: this link is made after the
+    // fact, so there is no honest cut-time stage to record. Writing today's
+    // stage would fabricate history.
+    const res = await pool.query(
       `INSERT INTO public."Lineage" ("parentId", "childId") VALUES ($1, $2) ON CONFLICT DO NOTHING`,
       [parentId, childId]
     );
+    if (!invariant('claim_parent.insert_matched_no_rows', res.rowCount === 1, { childId, parentId })) {
+      return { error: 'Could not create lineage link' };
+    }
   } catch {
     return { error: 'Could not create lineage link' };
   }

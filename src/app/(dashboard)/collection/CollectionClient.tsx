@@ -19,7 +19,7 @@ import Link from 'next/link';
 import { CategoryBadge } from '@/components/specimen/CategoryBadge';
 import { SpecimenThumb } from '@/components/specimen/SpecimenThumb';
 import { AddSpecimenDrawer } from '@/components/specimen/AddSpecimenDrawer';
-import { createSpecimen, type SpecimenRow } from '@/app/actions/specimens';
+import { createSpecimen, type SpecimenRow, type CoralStage } from '@/app/actions/specimens';
 import { ClaimWidget } from '@/components/dashboard/ClaimWidget';
 import Image from 'next/image';
 import styles from './collection.module.css';
@@ -153,8 +153,21 @@ export function CollectionClient({ specimens, stats, listings, firstName, specim
   async function handleCreate(values: {
     name: string; species?: string; category: string;
     origin?: string; notes?: string; photoUrl?: string; photoKey?: string;
+    tankName?: string; lightPar?: string; flowLevel?: string;
+    stage?: string; sourceKind?: string; parentId?: string;
+    sourceColony?: string; vendor?: string; generationFromMother?: string;
   }) {
-    const res = await createSpecimen(values);
+    const { sourceKind, generationFromMother, parentId, ...rest } = values;
+    const gen = generationFromMother?.trim() ? Number(generationFromMother) : undefined;
+    const payload = {
+      ...rest,
+      stage: rest.stage as CoralStage | undefined,
+      // An original has no parent and sits at generation 0 by definition.
+      ...(sourceKind === 'original' ? { generationFromMother: 0 } : {}),
+      ...(sourceKind === 'own'      ? { parentId } : {}),
+      ...(sourceKind === 'outside' && Number.isFinite(gen) ? { generationFromMother: gen } : {}),
+    };
+    const res = await createSpecimen(payload);
     // Thrown client-side so the drawer's own catch surfaces the message —
     // server-action errors are redacted in production builds.
     if ('error' in res) throw new Error(res.error);
@@ -184,6 +197,7 @@ export function CollectionClient({ specimens, stats, listings, firstName, specim
   return (
     <Box p={{ base: 'sm', md: 'lg' }} maw={1200}>
       <AddSpecimenDrawer
+        ownCorals={specimens.map(s => ({ id: s.id, name: s.name, rfCode: s.rfCode }))}
         opened={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onSubmit={handleCreate}

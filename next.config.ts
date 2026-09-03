@@ -11,7 +11,9 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
-      { source: '/', destination: '/collection', permanent: false },
+      // NOTE: '/' is deliberately NOT redirected. It serves the public landing
+      // page, which is the only crawlable entry point into the coral pages —
+      // redirecting it sent Googlebot straight to /sign-in.
       { source: '/dashboard', destination: '/collection', permanent: false },
       { source: '/corals', destination: '/collection', permanent: true },
       { source: '/corals/:path*', destination: '/collection/:path*', permanent: true },

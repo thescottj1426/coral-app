@@ -24,6 +24,14 @@ import { track } from '@vercel/analytics';
 import { z } from 'zod';
 import { CORAL_SPECIES, CORAL_COMMON_NAMES } from '@/lib/coralSpecies';
 
+export const CORAL_STAGES = [
+  { value: 'MOTHER_COLONY', label: 'Mother colony' },
+  { value: 'COLONY',        label: 'Colony' },
+  { value: 'MINI_COLONY',   label: 'Mini colony' },
+  { value: 'FRAG',          label: 'Frag' },
+  { value: 'MICRO_FRAG',    label: 'Micro frag' },
+] as const;
+
 const schema = z.object({
   name:      z.string().min(1, 'Name is required'),
   species:   z.string().optional(),
@@ -33,6 +41,20 @@ const schema = z.object({
   tankName:  z.string().optional(),
   lightPar:  z.string().optional(),
   flowLevel: z.string().optional(),
+  stage:     z.enum(['MOTHER_COLONY', 'COLONY', 'MINI_COLONY', 'FRAG', 'MICRO_FRAG']),
+  // Where it came from. Required so nothing enters the collection as an orphan.
+  sourceKind:           z.enum(['own', 'outside', 'original']),
+  parentId:             z.string().optional(),
+  sourceColony:         z.string().optional(),
+  vendor:               z.string().optional(),
+  generationFromMother: z.string().optional(),
+}).superRefine((v, ctx) => {
+  if (v.sourceKind === 'own' && !v.parentId) {
+    ctx.addIssue({ code: 'custom', path: ['parentId'], message: 'Pick which coral it was cut from' });
+  }
+  if (v.sourceKind === 'outside' && !v.sourceColony?.trim() && !v.vendor?.trim()) {
+    ctx.addIssue({ code: 'custom', path: ['vendor'], message: 'Add the farm or the source colony so its lineage is recorded' });
+  }
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -50,9 +72,11 @@ interface AddSpecimenDrawerProps {
   opened: boolean;
   onClose: () => void;
   onSubmit: (values: FormValues & { photoUrl?: string; photoKey?: string }) => Promise<void>;
+  /** The user's own corals, so a new specimen can be linked to what it was cut from. */
+  ownCorals?: Array<{ id: string; name: string; rfCode: string | null }>;
 }
 
-export function AddSpecimenDrawer({ opened, onClose, onSubmit }: AddSpecimenDrawerProps) {
+export function AddSpecimenDrawer({ opened, onClose, onSubmit, ownCorals = [] }: AddSpecimenDrawerProps) {
   const [loading, setLoading] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -67,6 +91,12 @@ export function AddSpecimenDrawer({ opened, onClose, onSubmit }: AddSpecimenDraw
       tankName:  '',
       lightPar:  '',
       flowLevel: '',
+      stage:     'FRAG',
+      sourceKind: 'outside',
+      parentId:   '',
+      sourceColony: '',
+      vendor:       '',
+      generationFromMother: '',
     },
   });
 
@@ -245,6 +275,80 @@ export function AddSpecimenDrawer({ opened, onClose, onSubmit }: AddSpecimenDraw
               ]}
               {...form.getInputProps('category')}
             />
+          </div>
+
+          <Divider />
+
+          {/* Propagation */}
+          <div>
+            <Text style={{ ...EYEBROW, marginBottom: 10 }}>propagation</Text>
+            <Stack gap="sm">
+              <Select
+                label="What is it right now?"
+                withAsterisk
+                data={CORAL_STAGES.map(s => ({ value: s.value, label: s.label }))}
+                allowDeselect={false}
+                {...form.getInputProps('stage')}
+              />
+
+              <div>
+                <Text size="sm" fw={500} mb={6}>
+                  Where did it come from? <Text span c="red" size="sm">*</Text>
+                </Text>
+                <SegmentedControl
+                  fullWidth
+                  data={[
+                    { value: 'own',      label: 'Cut from mine' },
+                    { value: 'outside',  label: 'From outside' },
+                    { value: 'original', label: 'Original' },
+                  ]}
+                  {...form.getInputProps('sourceKind')}
+                />
+              </div>
+
+              {form.values.sourceKind === 'own' && (
+                <Select
+                  label="Cut from which coral?"
+                  placeholder={ownCorals.length ? 'Pick one of your corals' : 'You have no corals yet'}
+                  searchable
+                  disabled={ownCorals.length === 0}
+                  data={ownCorals.map(c => ({
+                    value: c.id,
+                    label: c.rfCode ? `${c.name} · ${c.rfCode}` : c.name,
+                  }))}
+                  {...form.getInputProps('parentId')}
+                />
+              )}
+
+              {form.values.sourceKind === 'outside' && (
+                <>
+                  <TextInput
+                    label="Farm or seller"
+                    placeholder="e.g. World Wide Corals"
+                    description="Shown publicly on this coral's page — use a business name, not a person."
+                    {...form.getInputProps('vendor')}
+                  />
+                  <TextInput
+                    label="Mother colony it came from"
+                    placeholder="e.g. WWC Homewrecker mother"
+                    description="Shown publicly."
+                    {...form.getInputProps('sourceColony')}
+                  />
+                  <TextInput
+                    label="Generations from that mother"
+                    placeholder="e.g. 2 if it's an F2"
+                    inputMode="numeric"
+                    {...form.getInputProps('generationFromMother')}
+                  />
+                </>
+              )}
+
+              {form.values.sourceKind === 'original' && (
+                <Text size="xs" c="dimmed">
+                  Recorded as an original — generation 0, with no parent above it.
+                </Text>
+              )}
+            </Stack>
           </div>
 
           <Divider />

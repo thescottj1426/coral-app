@@ -9,6 +9,9 @@ import { uniqueRFCode } from '@/lib/rfCode';
 import { checkSpecimenCap } from '@/lib/entitlements';
 import { invariant } from '@/lib/log';
 
+export type CoralStage =
+  | 'MOTHER_COLONY' | 'COLONY' | 'MINI_COLONY' | 'FRAG' | 'MICRO_FRAG';
+
 export type SpecimenRow = {
   id: string;
   name: string;
@@ -24,6 +27,11 @@ export type SpecimenRow = {
   tankName: string | null;
   lightPar: string | null;
   flowLevel: string | null;
+  stage: CoralStage | null;
+  acquiredStage: CoralStage | null;
+  generationFromMother: number | null;
+  sourceColony: string | null;
+  vendor: string | null;
   coverPhotoUrl: string | null;
   coverPhotoPending: boolean | null;
 };
@@ -35,6 +43,7 @@ export async function getMySpecimens(userId?: string): Promise<SpecimenRow[]> {
        c.id, c.name, c.species, c.category, c."rfCode", c.origin, c.notes,
        c."identityHue", c."acquiredDate", c."createdAt", c."updatedAt",
        c."tankName", c."lightPar", c."flowLevel",
+       c."stage", c."acquiredStage", c."generationFromMother", c."sourceColony", c."vendor",
        (SELECT '/api/image?key=' || p."s3Key" FROM public."CoralPhoto" p WHERE p."coralId" = c.id ORDER BY CASE WHEN p.status = 'approved' THEN 0 ELSE 1 END, p."createdAt" ASC LIMIT 1) AS "coverPhotoUrl",
        (SELECT p.status = 'pending' FROM public."CoralPhoto" p WHERE p."coralId" = c.id ORDER BY CASE WHEN p.status = 'approved' THEN 0 ELSE 1 END, p."createdAt" ASC LIMIT 1) AS "coverPhotoPending"
      FROM public."Coral" c
@@ -54,6 +63,13 @@ export async function createSpecimen(data: {
   tankName?: string;
   lightPar?: string;
   flowLevel?: string;
+  stage?: CoralStage;
+  acquiredStage?: CoralStage;
+  generationFromMother?: number;
+  sourceColony?: string;
+  vendor?: string;
+  /** When set, links the new specimen to a coral the user already owns. */
+  parentId?: string;
   photoUrl?: string;
   photoKey?: string;
 }): Promise<SpecimenRow | { error: string }> {
@@ -67,18 +83,47 @@ export async function createSpecimen(data: {
 
   const { rows } = await pool.query<SpecimenRow>(
     `INSERT INTO public."Coral"
-       (id, name, species, category, origin, notes, "tankName", "lightPar", "flowLevel", "rfCode", "ownerId", "identityHue", "updatedAt")
+       (id, name, species, category, origin, notes, "tankName", "lightPar", "flowLevel",
+        stage, "acquiredStage", "generationFromMother", "sourceColony", vendor,
+        "rfCode", "ownerId", "identityHue", "updatedAt")
      VALUES
-       (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
-     RETURNING id, name, species, category, "rfCode", origin, notes, "tankName", "lightPar", "flowLevel", "identityHue", "acquiredDate", "createdAt", "updatedAt"`,
+       (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8,
+        $9::"CoralStage", $10::"CoralStage", $11, $12, $13,
+        $14, $15, $16, NOW())
+     RETURNING id, name, species, category, "rfCode", origin, notes, "tankName", "lightPar", "flowLevel",
+               stage, "acquiredStage", "generationFromMother", "sourceColony", vendor,
+               "identityHue", "acquiredDate", "createdAt", "updatedAt"`,
     [
       data.name, data.species ?? null, data.category, data.origin ?? null, data.notes ?? null,
       data.tankName ?? null, data.lightPar ?? null, data.flowLevel ?? null,
+      data.stage ?? null, data.acquiredStage ?? data.stage ?? null,
+      data.generationFromMother ?? null, data.sourceColony ?? null, data.vendor ?? null,
       rfCode, user.id, identityHue,
     ]
   );
 
   const specimen = rows[0];
+
+  // Linking to a coral the user already owns. Snapshot the parent's stage at
+  // cut time so the claim stays truthful after the parent grows and is edited.
+  if (data.parentId) {
+    const { rows: parentRows } = await pool.query<{ id: string; stage: CoralStage | null }>(
+      'SELECT id, stage FROM public."Coral" WHERE id = $1 AND "ownerId" = $2',
+      [data.parentId, user.id]
+    );
+    if (parentRows[0]) {
+      await pool.query(
+        `INSERT INTO public."Lineage" ("parentId", "childId", "parentStageAtCut")
+         VALUES ($1, $2, $3::"CoralStage") ON CONFLICT DO NOTHING`,
+        [parentRows[0].id, specimen.id, parentRows[0].stage]
+      );
+    } else {
+      invariant('specimen.parent_not_owned_by_creator', false, {
+        parentId: data.parentId,
+        specimenId: specimen.id,
+      });
+    }
+  }
 
   if (data.photoUrl && data.photoKey) {
     await pool.query(
@@ -145,6 +190,7 @@ export async function getPublicSpecimen(rfCodeOrId: string): Promise<SpecimenDet
        c.id, c.name, c.species, c.category, c."rfCode", c.origin, c.notes,
        c."identityHue", c."acquiredDate", c."createdAt", c."updatedAt",
        c."tankName", c."lightPar", c."flowLevel",
+       c."stage", c."acquiredStage", c."generationFromMother", c."sourceColony", c."vendor",
        c."ownerId",
        u.username AS "ownerUsername",
        u."displayName" AS "ownerDisplayName",
@@ -193,6 +239,7 @@ export async function getSpecimen(rfCodeOrId: string): Promise<SpecimenDetail | 
        c.id, c.name, c.species, c.category, c."rfCode", c.origin, c.notes,
        c."identityHue", c."acquiredDate", c."createdAt", c."updatedAt",
        c."tankName", c."lightPar", c."flowLevel",
+       c."stage", c."acquiredStage", c."generationFromMother", c."sourceColony", c."vendor",
        c."ownerId",
        u.username AS "ownerUsername",
        u."displayName" AS "ownerDisplayName",
@@ -233,19 +280,30 @@ export async function updateSpecimen(id: string, data: {
   tankName?: string;
   lightPar?: string;
   flowLevel?: string;
+  stage?: CoralStage;
+  acquiredStage?: CoralStage;
+  generationFromMother?: number;
+  sourceColony?: string;
+  vendor?: string;
 }): Promise<void> {
   const user = await getCurrentUser();
-  await pool.query(
+  const res = await pool.query(
     `UPDATE public."Coral"
      SET name=$1, species=$2, category=$3::\"CoralCategory\", origin=$4, notes=$5,
-         "tankName"=$6, "lightPar"=$7, "flowLevel"=$8, "updatedAt"=NOW()
-     WHERE id=$9 AND "ownerId"=$10`,
+         "tankName"=$6, "lightPar"=$7, "flowLevel"=$8,
+         stage=$9::\"CoralStage\", "acquiredStage"=$10::\"CoralStage\",
+         "generationFromMother"=$11, "sourceColony"=$12, vendor=$13,
+         "updatedAt"=NOW()
+     WHERE id=$14 AND "ownerId"=$15`,
     [
       data.name, data.species ?? null, data.category, data.origin ?? null, data.notes ?? null,
       data.tankName ?? null, data.lightPar ?? null, data.flowLevel ?? null,
+      data.stage ?? null, data.acquiredStage ?? null,
+      data.generationFromMother ?? null, data.sourceColony ?? null, data.vendor ?? null,
       id, user.id,
     ]
   );
+  invariant('specimen.update_matched_no_rows', res.rowCount === 1, { specimenId: id });
   revalidatePath('/collection');
   revalidatePath(`/collection/${id}`);
 }
@@ -290,4 +348,32 @@ export async function deleteSpecimen(id: string): Promise<void> {
     [id, user.id]
   );
   revalidatePath('/collection');
+}
+
+export type SitemapEntry = { path: string; updatedAt: string };
+
+/**
+ * Every publicly reachable URL, for the sitemap. Unclaimed frags are included
+ * deliberately — they resolve to a real claim page and are exactly what someone
+ * scanning a frag tag or googling a code should land on.
+ */
+export async function getPublicUrls(): Promise<SitemapEntry[]> {
+  const { rows: corals } = await pool.query<SitemapEntry>(
+    `SELECT '/coral/' || COALESCE(c."rfCode", c.id) AS path,
+            GREATEST(c."updatedAt", c."createdAt") AS "updatedAt"
+     FROM public."Coral" c
+     WHERE c."rfCode" IS NOT NULL
+     ORDER BY c."updatedAt" DESC
+     LIMIT 5000`
+  );
+
+  const { rows: users } = await pool.query<SitemapEntry>(
+    `SELECT '/users/' || u.username AS path, NOW() AS "updatedAt"
+     FROM public."User" u
+     WHERE u.username IS NOT NULL
+       AND EXISTS (SELECT 1 FROM public."Coral" c WHERE c."ownerId" = u.id)
+     LIMIT 5000`
+  );
+
+  return [...corals, ...users];
 }

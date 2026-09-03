@@ -6,6 +6,8 @@ import { getLineage, getChildren } from '@/app/actions/lineage';
 import { CategoryBadge } from '@/components/specimen/CategoryBadge';
 import { coralIdentityGradient } from '@/theme/theme';
 import { CtaBanner } from '@/components/coral/CtaBanner';
+import { stageLabel } from '@/lib/coralStage';
+import { siteUrl } from '@/lib/siteUrl';
 import type { LineageNode } from '@/app/actions/lineage';
 import type { PublicSpecimenStub } from '@/app/actions/specimens';
 
@@ -15,37 +17,64 @@ interface Props {
   params: Promise<{ rfCode: string }>;
 }
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? '';
+const APP_URL = siteUrl();
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { rfCode } = await params;
   const specimen = await getPublicSpecimen(rfCode);
-  if (!specimen) return { title: 'Not found — Coral Chest' };
+  if (!specimen) return { title: 'Not found' };
 
   const unclaimed = specimen.ownerId === null;
-  const owner = specimen.ownerUsername ? `@${specimen.ownerUsername}` : 'Unclaimed frag';
-  const description = specimen.notes
-    ?? `${specimen.category ?? 'Coral'} · ${owner} · RF ${specimen.rfCode}`;
-  const ogImage = specimen.photos[0]
-    ? `${APP_URL}${specimen.photos[0].url}`
-    : undefined;
 
+  // Three different queries land here: the coral's name, its species, and its
+  // RF code. The title carries all three so any of them can match.
+  const titleParts = [specimen.name];
+  if (specimen.species) titleParts.push(specimen.species);
+  if (specimen.rfCode) titleParts.push(specimen.rfCode);
   const title = unclaimed
-    ? `${specimen.name} · unclaimed frag ${specimen.rfCode} — Coral Chest`
-    : `${specimen.name} — Coral Chest`;
+    ? `${specimen.name} — unclaimed frag ${specimen.rfCode ?? ''}`.trim()
+    : titleParts.join(' — ');
+
+  // Generated rather than relying on notes, so a coral with none still gets a
+  // snippet that says something.
+  const facts = [
+    stageLabel(specimen.stage),
+    specimen.category,
+    specimen.species,
+    specimen.origin,
+    specimen.vendor ? `from ${specimen.vendor}` : null,
+    specimen.ownerUsername ? `kept by @${specimen.ownerUsername}` : 'unclaimed frag',
+    specimen.rfCode ? `RF code ${specimen.rfCode}` : null,
+  ].filter(Boolean);
+  const description = (specimen.notes?.trim() || `${specimen.name}: ${facts.join(' · ')}.`).slice(0, 300);
+
+  const ogImage = specimen.photos[0] ? `${APP_URL}${specimen.photos[0].url}` : undefined;
+  const canonical = `${APP_URL}/coral/${specimen.rfCode ?? specimen.id}`;
 
   return {
     title,
     description,
+    alternates: { canonical },
     openGraph: {
       title,
       description,
-      url: `${APP_URL}/coral/${specimen.rfCode}`,
+      url: canonical,
       images: ogImage ? [{ url: ogImage, width: 1200, height: 630, alt: specimen.name }] : [],
       type: 'article',
     },
-    twitter: { card: 'summary_large_image' },
+    twitter: { card: 'summary_large_image', title, description },
   };
+}
+
+function dateLabel(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function ageLabel(acquiredDate: string | null, createdAt: string) {
+  const weeks = Math.round((Date.now() - new Date(acquiredDate ?? createdAt).getTime()) / 604800000);
+  if (weeks < 1) return 'Just added';
+  if (weeks < 8) return `${weeks} week${weeks !== 1 ? 's' : ''}`;
+  return `${Math.round(weeks / 4.33)} month${Math.round(weeks / 4.33) !== 1 ? 's' : ''}`;
 }
 
 const EYEBROW: React.CSSProperties = {
@@ -68,7 +97,10 @@ function LineagePill({ node, dim }: { node: LineageNode; dim?: boolean }) {
       <Box style={{ width: 10, height: 10, borderRadius: '50%', background: bg, flexShrink: 0 }} />
       <Stack gap={0}>
         <Text size="xs" fw={600} style={{ lineHeight: 1.2 }}>{node.name}</Text>
-        <Text size="xs" c="dimmed">{node.ownerUsername ? `@${node.ownerUsername}` : 'Unclaimed'}</Text>
+        <Text size="xs" c="dimmed">
+          {node.ownerUsername ? `@${node.ownerUsername}` : 'Unclaimed'}
+          {node.parentStageAtCut ? ` · ${stageLabel(node.parentStageAtCut)}` : ''}
+        </Text>
       </Stack>
     </Group>
   );
@@ -103,7 +135,7 @@ function CoralStubCard({ c }: { c: PublicSpecimenStub }) {
       style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
     >
       <Paper withBorder style={{ overflow: 'hidden' }}>
-        <Box style={{ height: 100, position: 'relative', overflow: 'hidden' }}>
+        <Box style={{ height: 84, position: 'relative', overflow: 'hidden' }}>
           {c.coverPhotoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={c.coverPhotoUrl} alt={c.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -141,8 +173,49 @@ export default async function PublicCoralPage({ params }: Props) {
   // The frag itself has no owner; whoever owns its nearest ancestor cut it.
   const fraggedBy = ancestors[ancestors.length - 1]?.ownerUsername ?? null;
 
+  // Structured data: tells Google the RF code is an identifier and exposes
+  // stage/lineage as properties, making the page eligible for rich results.
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: specimen.name,
+    ...(specimen.species ? { alternateName: specimen.species } : {}),
+    description:
+      specimen.notes?.trim() ||
+      `${specimen.name}${specimen.species ? ` (${specimen.species})` : ''} — ${stageLabel(specimen.stage) ?? 'coral'} tracked on Coral Chest.`,
+    ...(specimen.rfCode ? { sku: specimen.rfCode, productID: specimen.rfCode } : {}),
+    ...(specimen.photos[0] ? { image: `${APP_URL}${specimen.photos[0].url}` } : {}),
+    ...(specimen.category ? { category: specimen.category } : {}),
+    ...(specimen.vendor ? { brand: { '@type': 'Brand', name: specimen.vendor } } : {}),
+    url: `${APP_URL}/coral/${specimen.rfCode ?? specimen.id}`,
+    additionalProperty: [
+      specimen.stage && { '@type': 'PropertyValue', name: 'Propagation stage', value: stageLabel(specimen.stage) },
+      specimen.sourceColony && { '@type': 'PropertyValue', name: 'Source colony', value: specimen.sourceColony },
+      specimen.origin && { '@type': 'PropertyValue', name: 'Origin', value: specimen.origin },
+      specimen.ownerUsername && { '@type': 'PropertyValue', name: 'Keeper', value: `@${specimen.ownerUsername}` },
+    ].filter(Boolean),
+  };
+
+  const breadcrumbLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Coral Chest', item: APP_URL },
+      { '@type': 'ListItem', position: 2, name: 'Explore', item: `${APP_URL}/explore` },
+      { '@type': 'ListItem', position: 3, name: specimen.name },
+    ],
+  };
+
   return (
-    <Box maw={900} mx="auto" py="lg" px="md">
+    <Box maw={1080} mx="auto" py="lg" px="md">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
+      />
       <CtaBanner />
 
       {/* Hero */}
@@ -226,14 +299,45 @@ export default async function PublicCoralPage({ params }: Props) {
               <Text size="sm" fw={600} c="dimmed">Not yet claimed</Text>
             )}
           </Stack>
-          {specimen.acquiredDate && (
+          {specimen.stage && (
             <Stack gap={0}>
-              <Text style={EYEBROW}>acquired</Text>
-              <Text size="sm" fw={600}>
-                {new Date(specimen.acquiredDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-              </Text>
+              <Text style={EYEBROW}>stage</Text>
+              <Text size="sm" fw={600}>{stageLabel(specimen.stage)}</Text>
             </Stack>
           )}
+          {specimen.vendor && (
+            <Stack gap={0}>
+              <Text style={EYEBROW}>farm / seller</Text>
+              <Text size="sm" fw={600}>{specimen.vendor}</Text>
+            </Stack>
+          )}
+          {specimen.sourceColony && (
+            <Stack gap={0}>
+              <Text style={EYEBROW}>cut from</Text>
+              <Text size="sm" fw={600}>{specimen.sourceColony}</Text>
+            </Stack>
+          )}
+          {specimen.origin && (
+            <Stack gap={0}>
+              <Text style={EYEBROW}>source</Text>
+              <Text size="sm" fw={600}>{specimen.origin}</Text>
+            </Stack>
+          )}
+          {/* Falls back to createdAt, matching the dashboard page — otherwise a
+              coral with no explicit acquired date shows a blank here and a real
+              date there. */}
+          <Stack gap={0}>
+            <Text style={EYEBROW}>acquired</Text>
+            <Text size="sm" fw={600}>{dateLabel(specimen.acquiredDate ?? specimen.createdAt)}</Text>
+          </Stack>
+          <Stack gap={0}>
+            <Text style={EYEBROW}>age in chest</Text>
+            <Text size="sm" fw={600}>{ageLabel(specimen.acquiredDate, specimen.createdAt)}</Text>
+          </Stack>
+          <Stack gap={0}>
+            <Text style={EYEBROW}>last updated</Text>
+            <Text size="sm" fw={600}>{dateLabel(specimen.updatedAt ?? specimen.createdAt)}</Text>
+          </Stack>
         </Group>
       </Paper>
 
@@ -323,14 +427,19 @@ export default async function PublicCoralPage({ params }: Props) {
       {specimen.photos.length > 1 && (
         <Paper withBorder p="md" mb="md">
           <Text style={{ ...EYEBROW, display: 'block', marginBottom: 12 }}>photos</Text>
-          <Group gap="sm" wrap="wrap">
+          {/* Scroll row rather than a wrapping grid — every photo stays in the
+              DOM for crawlers at a fraction of the vertical space. */}
+          <Box style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
             {specimen.photos.slice(1).map((photo) => (
-              <Box key={photo.id} style={{ width: 120, height: 120, borderRadius: 8, overflow: 'hidden' }}>
+              <Box
+                key={photo.id}
+                style={{ width: 110, height: 110, flexShrink: 0, borderRadius: 8, overflow: 'hidden' }}
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={photo.url} alt={specimen.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               </Box>
             ))}
-          </Group>
+          </Box>
         </Paper>
       )}
 

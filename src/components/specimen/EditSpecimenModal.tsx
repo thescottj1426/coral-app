@@ -21,6 +21,7 @@ import { z } from 'zod';
 import { updateSpecimen } from '@/app/actions/specimens';
 import type { SpecimenDetail } from '@/app/actions/specimens';
 import { CORAL_SPECIES, CORAL_COMMON_NAMES } from '@/lib/coralSpecies';
+import { CORAL_STAGES } from './AddSpecimenDrawer';
 
 const schema = z.object({
   name:      z.string().min(1, 'Name is required'),
@@ -31,6 +32,11 @@ const schema = z.object({
   tankName:  z.string().optional(),
   lightPar:  z.string().optional(),
   flowLevel: z.string().optional(),
+  stage:                z.enum(['MOTHER_COLONY','COLONY','MINI_COLONY','FRAG','MICRO_FRAG']).optional(),
+  acquiredStage:        z.enum(['MOTHER_COLONY','COLONY','MINI_COLONY','FRAG','MICRO_FRAG']).optional(),
+  generationFromMother: z.string().optional(),
+  sourceColony:         z.string().optional(),
+  vendor:               z.string().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -65,6 +71,11 @@ export function EditSpecimenModal({ opened, onClose, specimen }: EditSpecimenMod
       tankName:  specimen.tankName ?? '',
       lightPar:  specimen.lightPar ?? '',
       flowLevel: specimen.flowLevel ?? '',
+      stage:                specimen.stage ?? undefined,
+      acquiredStage:        specimen.acquiredStage ?? undefined,
+      generationFromMother: specimen.generationFromMother?.toString() ?? '',
+      sourceColony:         specimen.sourceColony ?? '',
+      vendor:               specimen.vendor ?? '',
     },
   });
 
@@ -87,7 +98,12 @@ export function EditSpecimenModal({ opened, onClose, specimen }: EditSpecimenMod
   async function handleSubmit(values: FormValues) {
     setLoading(true);
     try {
-      await updateSpecimen(specimen.id, values);
+      const { generationFromMother, ...rest } = values;
+      const gen = generationFromMother?.trim() ? Number(generationFromMother) : undefined;
+      await updateSpecimen(specimen.id, {
+        ...rest,
+        ...(Number.isFinite(gen) ? { generationFromMother: gen } : {}),
+      });
       router.refresh();
       onClose();
       notifications.show({
@@ -187,6 +203,44 @@ export function EditSpecimenModal({ opened, onClose, specimen }: EditSpecimenMod
               maxRows={6}
               {...form.getInputProps('notes')}
             />
+          </div>
+
+          <Divider />
+
+          <div>
+            <Text style={{ ...EYEBROW, marginBottom: 10 }}>propagation</Text>
+            <Stack gap="sm">
+              <Select
+                label="What is it now?"
+                placeholder="Not recorded"
+                data={CORAL_STAGES.map(o => ({ value: o.value, label: o.label }))}
+                {...form.getInputProps('stage')}
+              />
+              <Select
+                label="What was it when you got it?"
+                placeholder="Not recorded"
+                data={CORAL_STAGES.map(o => ({ value: o.value, label: o.label }))}
+                {...form.getInputProps('acquiredStage')}
+              />
+              <TextInput
+                label="Farm or seller"
+                placeholder="e.g. World Wide Corals"
+                description="Shown publicly on this coral's page."
+                {...form.getInputProps('vendor')}
+              />
+              <TextInput
+                label="Mother colony it came from"
+                placeholder="e.g. WWC Homewrecker mother"
+                description="Shown publicly."
+                {...form.getInputProps('sourceColony')}
+              />
+              <TextInput
+                label="Generations from that mother"
+                placeholder="e.g. 2"
+                inputMode="numeric"
+                {...form.getInputProps('generationFromMother')}
+              />
+            </Stack>
           </div>
 
           <Divider />
