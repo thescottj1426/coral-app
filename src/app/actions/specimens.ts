@@ -413,12 +413,16 @@ export async function restoreSpecimen(id: string): Promise<{ error?: string }> {
   const cap = await checkSpecimenCap(user);
   if (!cap.ok) return { error: cap.error };
 
-  await pool.query(
+  // Scoped to the owner, so a miss means the coral is gone or not theirs.
+  // Without this the UI reports a successful restore that never happened.
+  const res = await pool.query(
     `UPDATE public."Coral"
         SET status = 'ALIVE'::"CoralStatus", "statusAt" = NULL, "statusNote" = NULL, "updatedAt" = NOW()
       WHERE id = $1 AND "ownerId" = $2`,
     [id, user.id]
   );
+  if (res.rowCount !== 1) return { error: 'Specimen not found' };
+
   revalidatePath('/collection');
   revalidatePath(`/collection/${id}`);
   return {};
