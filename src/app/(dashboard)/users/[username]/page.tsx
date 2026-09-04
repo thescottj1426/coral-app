@@ -109,7 +109,7 @@ export default async function UserProfilePage({
               <Text size="xs" c="dimmed" style={{ gridColumn: '1 / -1' }}>No animals yet.</Text>
             )}
             {shown.map((s) => (
-              <Link key={s.id} href={`/collection/${s.id}`} style={{ textDecoration: 'none' }}>
+              <Link key={s.id} href={`/coral/${s.rfCode ?? s.id}`} style={{ textDecoration: 'none' }}>
                 <div className={css.colCard}>
                   <div
                     className={css.colImg}
@@ -253,7 +253,7 @@ export default async function UserProfilePage({
         <Text size="sm" c="dimmed">No animals yet.</Text>
       )}
       {specimens.map((s) => (
-        <Link key={s.id} href={`/collection/${s.id}`} style={{ textDecoration: 'none' }}>
+        <Link key={s.id} href={`/coral/${s.rfCode ?? s.id}`} style={{ textDecoration: 'none' }}>
           <Paper withBorder style={{ overflow: 'hidden' }}>
             <div
               style={{

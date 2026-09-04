@@ -347,7 +347,7 @@ export default async function SpecimenDetailPage({ params }: Props) {
               <span className={styles.eyebrow}>More from @{specimen.ownerUsername}</span>
               <div className={styles.moreRow}>
                 {moreByOwner.map(s => (
-                  <Link key={s.id} href={`/collection/${s.rfCode ?? s.id}`} className={styles.moreTile}>
+                  <Link key={s.id} href={`/coral/${s.rfCode ?? s.id}`} className={styles.moreTile}>
                     <div className={styles.moreTileThumb}>
                       {s.coverPhotoUrl ? (
                         <Image src={s.coverPhotoUrl} alt={s.name} fill style={{ objectFit: 'cover' }} />

@@ -84,7 +84,7 @@ function PostCard({ item }: { item: FeedItem }) {
       {item.kind === 'lineage' && item.parentName && (
         <div className={css.postBody}>
           <Text size="sm" c="dimmed">
-            Inherited from <Link href={`/collection/${item.parentId}`} style={{ fontWeight: 600, color: 'var(--mantine-color-anchor)' }}>{item.parentName}</Link>
+            Inherited from <Link href={`/coral/${item.parentRfCode ?? item.parentId}`} style={{ fontWeight: 600, color: 'var(--mantine-color-anchor)' }}>{item.parentName}</Link>
             {item.parentRfCode && <Text span ff="monospace" size="xs" c="dimmed"> · {item.parentRfCode}</Text>}
           </Text>
         </div>
@@ -120,7 +120,7 @@ function PostCard({ item }: { item: FeedItem }) {
           {item.kind === 'listing' && item.listingPrice != null ? (
             <Text className={css.embedPrice}>${item.listingPrice}</Text>
           ) : (
-            <Button component="a" href={`/collection/${item.specimenId}`} size="xs" variant="default">View</Button>
+            <Button component="a" href={`/coral/${item.specimenRfCode ?? item.specimenId}`} size="xs" variant="default">View</Button>
           )}
         </div>
       )}

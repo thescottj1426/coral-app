@@ -89,7 +89,7 @@ export default async function PedigreePage({ params }: Props) {
                   }}
                 />
                 <Stack gap={2} style={{ flex: 1 }}>
-                  <Link href={`/collection/${node.rfCode ?? node.id}`} style={{ fontSize: 14, fontWeight: 600, color: 'var(--mantine-primary-color-filled)', textDecoration: 'none' }}>
+                  <Link href={`/coral/${node.rfCode ?? node.id}`} style={{ fontSize: 14, fontWeight: 600, color: 'var(--mantine-primary-color-filled)', textDecoration: 'none' }}>
                     {node.name}
                   </Link>
                   <Group gap={6}>
@@ -153,7 +153,7 @@ export default async function PedigreePage({ params }: Props) {
                       }}
                     />
                     <Stack gap={2} style={{ flex: 1 }}>
-                      <Link href={`/collection/${child.rfCode ?? child.id}`} style={{ fontSize: 14, fontWeight: 600, color: 'var(--mantine-primary-color-filled)', textDecoration: 'none' }}>
+                      <Link href={`/coral/${child.rfCode ?? child.id}`} style={{ fontSize: 14, fontWeight: 600, color: 'var(--mantine-primary-color-filled)', textDecoration: 'none' }}>
                         {child.name}
                       </Link>
                       <Group gap={6}>
