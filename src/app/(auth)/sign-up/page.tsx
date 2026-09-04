@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { auth } from '@/lib/auth';
+import { googleConfigured } from '@/lib/authUrl';
 import { BrandPanel } from '@/components/auth/BrandPanel';
 import { SignUpForm } from '@/components/auth/SignUpForm';
 import styles from '@/components/auth/auth.module.css';
@@ -14,7 +15,7 @@ export default async function SignUpPage() {
   return (
     <div className={styles.root}>
       <BrandPanel />
-      <SignUpForm />
+      <SignUpForm googleEnabled={googleConfigured()} />
     </div>
   );
 }

@@ -36,7 +36,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-export function SignUpForm() {
+export function SignUpForm({ googleEnabled = false }: { googleEnabled?: boolean }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -124,15 +124,19 @@ export function SignUpForm() {
           Create account
         </Button>
 
-        <Divider label="or" labelPosition="center" />
+        {googleEnabled && (
+          <>
+            <Divider label="or" labelPosition="center" />
 
-        <Button
-          variant="default"
-          fullWidth
-          onClick={() => authClient.signIn.social({ provider: 'google', callbackURL: '/onboarding' })}
-        >
-          Continue with Google
-        </Button>
+            <Button
+              variant="default"
+              fullWidth
+              onClick={() => authClient.signIn.social({ provider: 'google', callbackURL: '/onboarding' })}
+            >
+              Continue with Google
+            </Button>
+          </>
+        )}
 
         <Text size="xs" c="dimmed" ta="center">
           By continuing, you agree to our{' '}

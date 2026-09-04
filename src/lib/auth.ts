@@ -2,17 +2,35 @@ import { betterAuth } from 'better-auth';
 import { Pool } from '@neondatabase/serverless';
 import { sendEmail } from './email';
 import { verifyTemplate, resetTemplate, welcomeTemplate } from './emailTemplates';
+import { authBaseUrl, googleConfigured } from './authUrl';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
+if (!googleConfigured()) {
+  console.warn('[auth] Google sign-in disabled: GOOGLE_CLIENT_ID/SECRET not set');
+}
+
 export const auth = betterAuth({
   database: pool,
-  socialProviders: {
-    google: {
-      clientId: process.env.GOOGLE_CLIENT_ID ?? '',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
-    },
-  },
+  // Explicit, so a stale BETTER_AUTH_URL cannot point production's OAuth
+  // callback at localhost.
+  baseURL: authBaseUrl(),
+  // Preview deployments each get their own origin; without this better-auth
+  // rejects the callback before Google is ever reached.
+  trustedOrigins: [
+    authBaseUrl(),
+    ...(process.env.VERCEL_URL ? [`https://${process.env.VERCEL_URL}`] : []),
+  ],
+  // Omitted entirely when unconfigured — registering with an empty clientId
+  // yields a button that redirects to a Google error page and logs nothing.
+  socialProviders: googleConfigured()
+    ? {
+        google: {
+          clientId: process.env.GOOGLE_CLIENT_ID!,
+          clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+        },
+      }
+    : {},
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,

@@ -26,7 +26,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-export function SignInForm() {
+export function SignInForm({ googleEnabled = false }: { googleEnabled?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const passwordReset = searchParams.get('reset') === '1';
@@ -116,15 +116,19 @@ export function SignInForm() {
           Sign in
         </Button>
 
-        <Divider label="or" labelPosition="center" />
+        {googleEnabled && (
+          <>
+            <Divider label="or" labelPosition="center" />
 
-        <Button
-          variant="default"
-          fullWidth
-          onClick={() => authClient.signIn.social({ provider: 'google', callbackURL: '/dashboard' })}
-        >
-          Continue with Google
-        </Button>
+            <Button
+              variant="default"
+              fullWidth
+              onClick={() => authClient.signIn.social({ provider: 'google', callbackURL: '/dashboard' })}
+            >
+              Continue with Google
+            </Button>
+          </>
+        )}
 
         <Divider label="new here?" labelPosition="center" />
 
