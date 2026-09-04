@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getExploreSpecimens } from '@/app/actions/explore';
-import { getFeedItems } from '@/app/actions/feed';
-import { getHomeStats, getDeepestChain, getTopKeepers } from '@/app/actions/home';
+import { getHomeStats, getDeepestChain, getTopKeepers, getHomeActivity } from '@/app/actions/home';
 import { siteUrl } from '@/lib/siteUrl';
 import { coralIdentityGradient } from '@/theme/theme';
 import { HomeSpecimens } from './HomeSpecimens';
+import { HomeHeaderAuth, HomeHeroCta } from './HomeAuth';
 import styles from './home.module.css';
 
 const BASE = siteUrl();
@@ -34,12 +34,6 @@ function ago(iso: string) {
   return `${Math.floor(h / 24)}d`;
 }
 
-function eventLabel(kind: string) {
-  if (kind === 'lineage') return 'Frag cut and passed to a new keeper';
-  if (kind === 'listing') return 'Frag listed for sale';
-  return 'New specimen logged';
-}
-
 export default async function LandingPage() {
   // Every query is wrapped — this is the crawlable entry point and must render
   // even if the database is unreachable.
@@ -48,7 +42,7 @@ export default async function LandingPage() {
     getHomeStats().catch(() => ({ specimens: 0, chains: 0, keepers: 0, farms: 0, loggedToday: 0 })),
     getDeepestChain().catch(() => null),
     getTopKeepers(5).catch(() => []),
-    getFeedItems(6).catch(() => []),
+    getHomeActivity(6).catch(() => []),
   ]);
 
   return (
@@ -84,10 +78,7 @@ export default async function LandingPage() {
           </form>
         </div>
 
-        <div className={styles.headerCtas}>
-          <Link href="/sign-in" className={styles.act}>Sign in</Link>
-          <Link href="/sign-up" className={styles.pri}>Join free</Link>
-        </div>
+        <HomeHeaderAuth />
       </header>
 
       <section className={styles.hero}>
@@ -101,10 +92,7 @@ export default async function LandingPage() {
             Every specimen carries an RF code, a photo history and a verified parent.
             Log yours, pass frags, and the lineage builds itself.
           </p>
-          <div className={styles.heroCtas}>
-            <Link href="/sign-up" className={styles.ctaPri}>Start your chest</Link>
-            <Link href="/explore" className={styles.ctaAct}>Browse specimens</Link>
-          </div>
+          <HomeHeroCta />
 
           <div className={styles.heroStats}>
             {[
@@ -207,12 +195,12 @@ export default async function LandingPage() {
               activity.map((a) => (
                 <Link
                   key={a.id}
-                  href={a.specimenId ? `/coral/${a.specimenRfCode ?? a.specimenId}` : '/explore'}
+                  href={`/coral/${a.rfCode ?? a.coralId}`}
                   className={styles.linRow}
                 >
-                  <span className={`${styles.linCode} ${styles.mono}`}>{a.specimenRfCode ?? '—'}</span>
-                  <span className={styles.linEvent}>{eventLabel(a.kind)}</span>
-                  <span className={styles.linWho}>@{a.actorUsername}</span>
+                  <span className={`${styles.linCode} ${styles.mono}`}>{a.rfCode ?? '—'}</span>
+                  <span className={styles.linEvent}>{a.event}</span>
+                  <span className={styles.linWho}>{a.who ? `@${a.who}` : 'Unclaimed'}</span>
                   <span className={styles.linAgo}>{ago(a.createdAt)}</span>
                 </Link>
               ))

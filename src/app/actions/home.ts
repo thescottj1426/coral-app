@@ -85,3 +85,52 @@ export async function getTopKeepers(limit = 5): Promise<TopKeeper[]> {
   );
   return rows;
 }
+
+export type HomeActivity = {
+  id: string;
+  rfCode: string | null;
+  coralId: string;
+  name: string;
+  event: string;
+  who: string | null;
+  createdAt: string;
+};
+
+/**
+ * Global lineage activity for the public landing page.
+ *
+ * Deliberately NOT getFeedItems: that reads the session via headers(), which
+ * opts the whole page out of static rendering. The home feed is public and
+ * unpersonalised, so it needs no session at all.
+ */
+export async function getHomeActivity(limit = 6): Promise<HomeActivity[]> {
+  const { rows } = await pool.query<HomeActivity>(
+    `SELECT l.id::text                       AS id,
+            child."rfCode"                   AS "rfCode",
+            child.id                         AS "coralId",
+            child.name,
+            'Frag cut and passed to a new keeper' AS event,
+            u.username                       AS who,
+            l."createdAt"                    AS "createdAt"
+     FROM public."Lineage" l
+     JOIN public."Coral" child ON child.id = l."childId"
+     LEFT JOIN public."User" u ON u.id = child."ownerId"
+
+     UNION ALL
+
+     SELECT c.id                             AS id,
+            c."rfCode"                       AS "rfCode",
+            c.id                             AS "coralId",
+            c.name,
+            'New specimen logged'            AS event,
+            u.username                       AS who,
+            c."createdAt"                    AS "createdAt"
+     FROM public."Coral" c
+     JOIN public."User" u ON u.id = c."ownerId"
+
+     ORDER BY "createdAt" DESC
+     LIMIT $1`,
+    [limit]
+  );
+  return rows;
+}
