@@ -18,9 +18,9 @@ jobs:
     name: Typecheck, lint, unit tests, build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -47,9 +47,9 @@ jobs:
     # Skipped on forks, which cannot read secrets.
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -59,19 +59,37 @@ jobs:
       # A throwaway branch per run. Its endpoint id is new, so guard.ts accepts
       # it, and nothing durable is ever truncated.
       #
-      # `parent_branch` is load-bearing: production is the project's DEFAULT
-      # branch, so omitting it clones real user data into the branch the tests
-      # truncate, in a public repo's logs. The input is `parent_branch` — an
-      # undeclared name like `parent` is silently ignored, which is exactly the
-      # failure that would go unnoticed.
+      # `parent` is load-bearing: production is the project's DEFAULT branch, so
+      # getting this wrong clones real user data into the branch the tests
+      # truncate. The input name is exactly `parent` — an unrecognised name is a
+      # warning, not an error, so a typo here fails silently and green.
       - name: Create Neon branch
         id: neon
         uses: neondatabase/create-branch-action@v5
         with:
           project_id: ${{ secrets.NEON_PROJECT_ID }}
-          parent_branch: staging
+          parent: staging
           branch_name: ci-${{ github.run_id }}
           api_key: ${{ secrets.NEON_API_KEY }}
+
+      # A mistyped `parent` is only a warning, so the branch would quietly come
+      # from production instead. Assert the lineage rather than trusting it.
+      - name: Check the branch came from staging
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          STAGING_BRANCH_ID: br-steep-dream-ai7mj113
+        run: |
+          set -euo pipefail
+          parent=$(curl -sf \
+            -H "Authorization: Bearer $NEON_API_KEY" \
+            "https://console.neon.tech/api/v2/projects/${{ secrets.NEON_PROJECT_ID }}/branches" \
+            | jq -r --arg n "ci-${{ github.run_id }}" \
+                '.branches[] | select(.name==$n) | .parent_id')
+          echo "parent_id=$parent"
+          if [ "$parent" != "$STAGING_BRANCH_ID" ]; then
+            echo "::error::CI branch parent is $parent, expected staging ($STAGING_BRANCH_ID)."
+            exit 1
+          fi
 
       # An unset output silently becomes an empty env var, and db.ts would then
       # fall back to .env.test, which does not exist here — the error names a
