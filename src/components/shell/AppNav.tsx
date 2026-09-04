@@ -9,13 +9,18 @@ import {
   IconMessageCircle,
 } from '@tabler/icons-react';
 import styles from './shell.module.css';
+import { NAV_ITEMS } from '@/lib/nav';
 
-const TABS = [
-  { label: 'Collect',  href: '/collection', icon: IconSeeding },
-  { label: 'Explore',  href: '/explore',    icon: IconCompass },
-  { label: 'Discuss',  href: '/discuss',    icon: IconMessageCircle },
-  { label: 'Feed',     href: '/feed',       icon: IconRss },
-];
+// Routes come from NAV_ITEMS so the landing page cannot drift from this list.
+// Only the icons live here — they are client components.
+const ICONS = {
+  '/collection': IconSeeding,
+  '/explore': IconCompass,
+  '/discuss': IconMessageCircle,
+  '/feed': IconRss,
+} as const;
+
+const TABS = NAV_ITEMS.map((item) => ({ ...item, icon: ICONS[item.href] }));
 
 export function BottomNav() {
   const pathname = usePathname();

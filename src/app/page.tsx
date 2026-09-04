@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { getExploreSpecimens } from '@/app/actions/explore';
 import { getHomeStats, getDeepestChain, getTopKeepers, getHomeActivity } from '@/app/actions/home';
 import { siteUrl } from '@/lib/siteUrl';
+import { NAV_ITEMS } from '@/lib/nav';
 import { coralIdentityGradient } from '@/theme/theme';
 import { HomeSpecimens } from './HomeSpecimens';
 import { HomeHeaderAuth, HomeHeroCta } from './HomeAuth';
@@ -59,9 +60,11 @@ export default async function LandingPage() {
         </Link>
 
         <nav className={styles.nav}>
-          <Link href="/explore" className={styles.navLink}>Explore</Link>
-          <Link href="/explore" className={styles.navLink}>Lineage</Link>
-          <Link href="/explore" className={styles.navLink}>Farms</Link>
+          {NAV_ITEMS.map(({ label, href }) => (
+            <Link key={href} href={href} className={styles.navLink}>
+              {label}
+            </Link>
+          ))}
         </nav>
 
         <div className={styles.searchWrap}>
