@@ -59,17 +59,27 @@ jobs:
       # A throwaway branch per run. Its endpoint id is new, so guard.ts accepts
       # it, and nothing durable is ever truncated.
       #
-      # `parent` is load-bearing: production is the project's DEFAULT branch, so
-      # omitting this clones real user data into the branch the tests truncate,
-      # in a public repo's logs.
+      # `parent_branch` is load-bearing: production is the project's DEFAULT
+      # branch, so omitting it clones real user data into the branch the tests
+      # truncate, in a public repo's logs. The input is `parent_branch` — an
+      # undeclared name like `parent` is silently ignored, which is exactly the
+      # failure that would go unnoticed.
       - name: Create Neon branch
         id: neon
         uses: neondatabase/create-branch-action@v5
         with:
           project_id: ${{ secrets.NEON_PROJECT_ID }}
-          parent: staging
+          parent_branch: staging
           branch_name: ci-${{ github.run_id }}
           api_key: ${{ secrets.NEON_API_KEY }}
+
+      # An unset output silently becomes an empty env var, and db.ts would then
+      # fall back to .env.test, which does not exist here — the error names a
+      # missing file rather than a broken step.
+      - name: Check the branch connection resolved
+        run: |
+          test -n "${{ steps.neon.outputs.db_url }}" || { echo "db_url is empty"; exit 1; }
+          test -n "${{ steps.neon.outputs.db_url_pooled }}" || { echo "db_url_pooled is empty"; exit 1; }
 
       # The branch inherits whatever schema staging happens to have. Migrations
       # are additive and idempotent, so running them here keeps the suite from
