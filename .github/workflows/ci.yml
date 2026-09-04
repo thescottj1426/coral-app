@@ -58,7 +58,7 @@ jobs:
   # Node 20 is the floor Next 16 declares (engines: >=20.9.0); 18 is EOL and
   # would fail install. 24 is the forward check.
   unit:
-    name: Unit tests
+    name: Guard + component tests
     runs-on: ${{ matrix.os }}
     strategy:
       # One red cell should not cancel the others — knowing it fails on Node 24
