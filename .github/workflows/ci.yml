@@ -79,7 +79,6 @@ jobs:
       - name: Check the branch connection resolved
         run: |
           test -n "${{ steps.neon.outputs.db_url }}" || { echo "db_url is empty"; exit 1; }
-          test -n "${{ steps.neon.outputs.db_url_pooled }}" || { echo "db_url_pooled is empty"; exit 1; }
 
       # The branch inherits whatever schema staging happens to have. Migrations
       # are additive and idempotent, so running them here keeps the suite from
@@ -89,10 +88,13 @@ jobs:
         env:
           DATABASE_URL: ${{ steps.neon.outputs.db_url }}
 
+      # db_url, not db_url_pooled: no endpoint in this project has pooling
+      # enabled, so the action emits nothing for the pooled output. A single
+      # test process does not need a pooler anyway.
       - name: Feature tests
         run: npm run test:feature
         env:
-          TEST_DATABASE_URL: ${{ steps.neon.outputs.db_url_pooled }}
+          TEST_DATABASE_URL: ${{ steps.neon.outputs.db_url }}
 
       # always() so a failed test still cleans up its branch.
       - name: Delete Neon branch
