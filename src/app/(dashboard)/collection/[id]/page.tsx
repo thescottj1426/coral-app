@@ -122,9 +122,6 @@ export default async function SpecimenDetailPage({ params }: Props) {
             Claim this lineage
           </Button>
         )}
-        <Button component="a" href="#discuss" variant="default" size="sm">
-          Ask about it
-        </Button>
         {specimen.rfCode && <RfCodeQr rfCode={specimen.rfCode} variant="button" />}
       </div>
 
