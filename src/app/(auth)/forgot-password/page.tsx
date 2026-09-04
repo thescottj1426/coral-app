@@ -56,7 +56,7 @@ export default function ForgotPasswordPage() {
             <div className={styles.formHeader}>
               <Title order={2}>Forgot password?</Title>
               <Text c="dimmed" size="sm" mt={2}>
-                Enter your email and we'll send a reset link.
+                Enter your email and we&apos;ll send a reset link.
               </Text>
             </div>
 

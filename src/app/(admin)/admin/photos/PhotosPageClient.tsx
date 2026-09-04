@@ -115,7 +115,7 @@ function HistoryRow({ photo }: { photo: ReviewedPhoto }) {
             {photo.coralRfCode && <Text style={EYEBROW}>{photo.coralRfCode}</Text>}
           </Group>
           {photo.reviewNote && (
-            <Text size="xs" c="dimmed" fs="italic">"{photo.reviewNote}"</Text>
+            <Text size="xs" c="dimmed" fs="italic">&quot;{photo.reviewNote}&quot;</Text>
           )}
         </Stack>
         <Stack gap={2} align="flex-end" style={{ flexShrink: 0 }}>

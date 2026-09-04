@@ -281,7 +281,7 @@ function ClaimContent() {
                 <ThemeIcon size={18} radius="xl" color="ocean" variant="light">
                   <IconShield size={11} />
                 </ThemeIcon>
-                <Text style={EYEBROW}>lineage you'll inherit</Text>
+                <Text style={EYEBROW}>lineage you&apos;ll inherit</Text>
               </Group>
               <LineageChain parent={parent} />
               <Divider my="sm" />

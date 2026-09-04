@@ -24,8 +24,8 @@ export default function TermsPage() {
         </div>
 
         <Text size="sm" style={{ lineHeight: 1.75 }}>
-          Welcome to Coral Chest ("we," "us," or "our"). By creating an account or using
-          Coral Chest at coralchest.com (the "Service"), you agree to these Terms of Service.
+          Welcome to Coral Chest (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;). By creating an account or using
+          Coral Chest at coralchest.com (the &quot;Service&quot;), you agree to these Terms of Service.
           Please read them carefully. If you do not agree, do not use the Service.
         </Text>
 
@@ -34,7 +34,7 @@ export default function TermsPage() {
           <Title order={3} style={SECTION}>1. Who Can Use Coral Chest</Title>
           <Text size="sm" mt={8} style={{ lineHeight: 1.75 }}>
             You must be at least 13 years old to use the Service. If you are under 18,
-            you must have your parent's or guardian's permission. By using the Service
+            you must have your parent&apos;s or guardian&apos;s permission. By using the Service
             you represent that you meet these requirements.
           </Text>
         </div>
@@ -72,7 +72,7 @@ export default function TermsPage() {
             non-exclusive, royalty-free license to store, display, and distribute that
             content as part of operating and promoting the Service. You represent that
             you own or have the rights to any content you upload and that it does not
-            violate anyone else's rights.
+            violate anyone else&apos;s rights.
           </Text>
           <Text size="sm" mt={8} style={{ lineHeight: 1.75 }}>
             We review photos before they are made publicly visible. We may remove or
@@ -124,7 +124,7 @@ export default function TermsPage() {
         <div>
           <Title order={3} style={SECTION}>8. Disclaimer of Warranties</Title>
           <Text size="sm" mt={8} style={{ lineHeight: 1.75 }}>
-            The Service is provided "as is" and "as available" without warranties of any
+            The Service is provided &quot;as is&quot; and &quot;as available&quot; without warranties of any
             kind, either express or implied. We do not warrant that the Service will be
             uninterrupted, error-free, or free of harmful components. Your use of the
             Service is at your own risk.

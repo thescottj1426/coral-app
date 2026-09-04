@@ -22,7 +22,7 @@ export default function GlobalError({
           <Stack gap="md" align="center">
             <Title order={2} style={{ fontFamily: 'var(--font-sora)' }}>Something went wrong</Title>
             <Text c="dimmed" size="sm">
-              An unexpected error occurred. We've been notified and are looking into it.
+              An unexpected error occurred. We&apos;ve been notified and are looking into it.
             </Text>
             <Button onClick={reset} variant="default" size="sm">Try again</Button>
           </Stack>

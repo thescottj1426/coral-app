@@ -24,9 +24,9 @@ export default function PrivacyPage() {
         </div>
 
         <Text size="sm" style={{ lineHeight: 1.75 }}>
-          Coral Chest ("we," "us," or "our") takes your privacy seriously. This policy
+          Coral Chest (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) takes your privacy seriously. This policy
           explains what information we collect, how we use it, and your rights regarding
-          your data when you use coralchest.com (the "Service").
+          your data when you use coralchest.com (the &quot;Service&quot;).
         </Text>
 
         {/* 1 */}
@@ -177,7 +177,7 @@ export default function PrivacyPage() {
 
         {/* 8 */}
         <div>
-          <Title order={3} style={SECTION}>8. Children's Privacy</Title>
+          <Title order={3} style={SECTION}>8. Children&apos;s Privacy</Title>
           <Text size="sm" mt={8} style={{ lineHeight: 1.75 }}>
             Coral Chest is not directed to children under 13. We do not knowingly
             collect personal information from children under 13. If you believe we have
