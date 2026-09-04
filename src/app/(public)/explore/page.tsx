@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { getExploreSpecimens, getExploreCollectors } from '@/app/actions/explore';
-import { ExploreClient } from '@/app/(dashboard)/explore/ExploreClient';
+import { ExploreClient } from './ExploreClient';
 
 export const revalidate = 60;
 

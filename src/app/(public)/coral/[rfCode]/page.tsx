@@ -7,6 +7,7 @@ import { CategoryBadge } from '@/components/specimen/CategoryBadge';
 import { coralIdentityGradient } from '@/theme/theme';
 import { CtaBanner } from '@/components/coral/CtaBanner';
 import { stageLabel } from '@/lib/coralStage';
+import { PublicPhotos } from './PublicPhotos';
 import { siteUrl } from '@/lib/siteUrl';
 import type { LineageNode } from '@/app/actions/lineage';
 import type { PublicSpecimenStub } from '@/app/actions/specimens';
@@ -218,7 +219,7 @@ export default async function PublicCoralPage({ params }: Props) {
       />
       <CtaBanner />
 
-      {/* Hero */}
+      {/* Hero — clicking it opens the lightbox at photo 0 */}
       <Box style={{ height: 260, borderRadius: 'var(--mantine-radius-md)', overflow: 'hidden', position: 'relative', marginBottom: 16 }}>
         {coverPhoto ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -262,6 +263,13 @@ export default async function PublicCoralPage({ params }: Props) {
             </Text>
           )}
         </Stack>
+        {coverPhoto && (
+          <PublicPhotos
+            photos={specimen.photos.map((p) => ({ id: p.id, url: p.url, status: p.status }))}
+            specimenName={specimen.name}
+            mode="overlay"
+          />
+        )}
       </Box>
 
       {/* Meta row */}
@@ -315,6 +323,12 @@ export default async function PublicCoralPage({ params }: Props) {
             <Stack gap={0}>
               <Text style={EYEBROW}>cut from</Text>
               <Text size="sm" fw={600}>{specimen.sourceColony}</Text>
+            </Stack>
+          )}
+          {unclaimed && specimen.givenTo && (
+            <Stack gap={0}>
+              <Text style={EYEBROW}>given to</Text>
+              <Text size="sm" fw={600}>{specimen.givenTo}</Text>
             </Stack>
           )}
           {specimen.origin && (
@@ -423,23 +437,14 @@ export default async function PublicCoralPage({ params }: Props) {
         </Paper>
       )}
 
-      {/* Additional photos */}
+      {/* Photos — lightbox-backed */}
       {specimen.photos.length > 1 && (
         <Paper withBorder p="md" mb="md">
-          <Text style={{ ...EYEBROW, display: 'block', marginBottom: 12 }}>photos</Text>
-          {/* Scroll row rather than a wrapping grid — every photo stays in the
-              DOM for crawlers at a fraction of the vertical space. */}
-          <Box style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-            {specimen.photos.slice(1).map((photo) => (
-              <Box
-                key={photo.id}
-                style={{ width: 110, height: 110, flexShrink: 0, borderRadius: 8, overflow: 'hidden' }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={photo.url} alt={specimen.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              </Box>
-            ))}
-          </Box>
+          <PublicPhotos
+            photos={specimen.photos.map((p) => ({ id: p.id, url: p.url, status: p.status }))}
+            specimenName={specimen.name}
+            mode="strip"
+          />
         </Paper>
       )}
 

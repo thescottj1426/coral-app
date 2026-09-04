@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { pool } from '@/lib/db';
 import { auth } from '@/lib/auth';
 import { invariant } from '@/lib/log';
+import { getCurrentUser } from '@/lib/getCurrentUser';
 import type { SpecimenRow } from './specimens';
 
 export type UserProfile = {
@@ -189,7 +190,10 @@ function normalizeProfileValue(key: keyof UpdateProfileData, data: UpdateProfile
 export async function updateProfile(data: UpdateProfileData): Promise<void> {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) throw new Error('Not authenticated');
-  const userId = session.user.id;
+  // Matching session.user.id against User.id silently updates zero rows for
+  // accounts migrated from the old auth system — the exact mismatch
+  // getCurrentUser exists to resolve.
+  const userId = (await getCurrentUser()).id;
 
   const setClauses: string[] = [];
   const params: unknown[] = [userId];

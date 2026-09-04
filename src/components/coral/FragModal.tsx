@@ -20,7 +20,9 @@ import {
 import { IconCopy, IconCheck, IconLeaf, IconScissors, IconPlus, IconLink } from '@tabler/icons-react';
 import { useState, useTransition } from 'react';
 import { CoralThumb } from './CoralThumb';
+import { notifications } from '@mantine/notifications';
 import { createFrags } from '@/app/actions/lineage';
+import { FragRow, type LoggedFrag } from './FragRow';
 import { CORAL_STAGES } from '@/components/specimen/AddSpecimenDrawer';
 import type { CoralStage } from '@/app/actions/specimens';
 
@@ -44,20 +46,24 @@ export interface FragModalProps {
 
 export function FragModal({ opened, onClose, parentId, parentRfCode, parentName, parentGeneration }: FragModalProps) {
   const newGeneration = parentGeneration + 1;
-  const [codes, setCodes] = useState<string[]>([]);
+  const [frags, setFrags] = useState<LoggedFrag[]>([]);
   const [stage, setStage] = useState<CoralStage>('FRAG');
   const [keepForSelf, setKeepForSelf] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   function addFrag() {
     startTransition(async () => {
-      const newCodes = await createFrags(parentId, 1, { stage, keepForSelf });
-      setCodes((prev) => [...prev, ...newCodes]);
+      const created = await createFrags(parentId, 1, { stage, keepForSelf });
+      if ('error' in created) {
+        notifications.show({ title: 'Could not log frag', message: created.error, color: 'red' });
+        return;
+      }
+      setFrags((prev) => [...prev, ...created]);
     });
   }
 
   function handleClose() {
-    setCodes([]);
+    setFrags([]);
     onClose();
   }
 
@@ -78,7 +84,7 @@ export function FragModal({ opened, onClose, parentId, parentRfCode, parentName,
                 Frag logger
               </Text>
               <Badge variant="light" color="teal" size="sm" radius="xl">
-                {codes.length} {codes.length === 1 ? 'frag' : 'frags'}
+                {frags.length} {frags.length === 1 ? 'frag' : 'frags'}
               </Badge>
             </Group>
             <Text size="xs" c="dimmed">Share each RF code with whoever receives that plug</Text>
@@ -111,10 +117,10 @@ export function FragModal({ opened, onClose, parentId, parentRfCode, parentName,
         <Stack gap={4}>
           <Group justify="space-between" align="center" mb={4}>
             <Text style={EYEBROW}>rf codes registered</Text>
-            <Text size="xs" c="dimmed">{codes.length} frag{codes.length !== 1 ? 's' : ''} logged</Text>
+            <Text size="xs" c="dimmed">{frags.length} frag{frags.length !== 1 ? 's' : ''} logged</Text>
           </Group>
 
-          {codes.length === 0 ? (
+          {frags.length === 0 ? (
             isPending ? (
               <Group justify="center" py="md">
                 <Loader size="sm" color="teal" />
@@ -127,72 +133,10 @@ export function FragModal({ opened, onClose, parentId, parentRfCode, parentName,
               </Paper>
             )
           ) : (
-            <ScrollArea.Autosize mah={280} offsetScrollbars>
+            <ScrollArea.Autosize mah={320} offsetScrollbars>
               <Stack gap={6}>
-                {codes.map((code, i) => (
-                  <Paper
-                    key={code}
-                    p="sm"
-                    style={{
-                      background: 'var(--mantine-color-ocean-0)',
-                      border: '1px solid var(--mantine-color-ocean-2)',
-                    }}
-                  >
-                    <Group gap={10} wrap="nowrap" align="center">
-                      <Text
-                        style={{
-                          fontFamily: 'var(--font-ibm-plex-mono), monospace',
-                          fontSize: 10,
-                          color: 'var(--mantine-color-dimmed)',
-                          width: 20,
-                          flexShrink: 0,
-                          textAlign: 'right',
-                        }}
-                      >
-                        {i + 1}
-                      </Text>
-                      <Text
-                        style={{
-                          fontFamily: 'var(--font-ibm-plex-mono), monospace',
-                          fontSize: 20,
-                          fontWeight: 700,
-                          letterSpacing: '0.1em',
-                          color: 'var(--mantine-color-ocean-9)',
-                          flex: 1,
-                        }}
-                      >
-                        {code}
-                      </Text>
-                      <CopyButton value={code} timeout={2000}>
-                        {({ copied, copy }) => (
-                          <ActionIcon
-                            variant="light"
-                            color={copied ? 'teal' : 'ocean'}
-                            size="md"
-                            radius="md"
-                            onClick={copy}
-                            aria-label={`Copy ${code}`}
-                          >
-                            {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
-                          </ActionIcon>
-                        )}
-                      </CopyButton>
-                      <CopyButton value={`${typeof window !== 'undefined' ? window.location.origin : ''}/claim?code=${code}`} timeout={2000}>
-                        {({ copied, copy }) => (
-                          <ActionIcon
-                            variant="light"
-                            color={copied ? 'teal' : 'gray'}
-                            size="md"
-                            radius="md"
-                            onClick={copy}
-                            aria-label="Copy claim link"
-                          >
-                            {copied ? <IconCheck size={14} /> : <IconLink size={14} />}
-                          </ActionIcon>
-                        )}
-                      </CopyButton>
-                    </Group>
-                  </Paper>
+                {frags.map((f, i) => (
+                  <FragRow key={f.id} frag={f} index={i} />
                 ))}
               </Stack>
             </ScrollArea.Autosize>
@@ -202,7 +146,8 @@ export function FragModal({ opened, onClose, parentId, parentRfCode, parentName,
         {/* What is being cut, and whether it stays with you */}
         <Stack gap="sm">
           <Select
-            label="What are you cutting off?"
+            label="Frag size"
+            description="The size of the new plug, not the colony it came from."
             data={CORAL_STAGES.map(o => ({ value: o.value, label: o.label }))}
             value={stage}
             onChange={(v) => v && setStage(v as CoralStage)}

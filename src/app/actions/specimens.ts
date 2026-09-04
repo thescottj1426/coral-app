@@ -32,6 +32,10 @@ export type SpecimenRow = {
   generationFromMother: number | null;
   sourceColony: string | null;
   vendor: string | null;
+  status: CoralStatus;
+  statusAt: string | null;
+  statusNote: string | null;
+  givenTo: string | null;
   coverPhotoUrl: string | null;
   coverPhotoPending: boolean | null;
 };
@@ -44,6 +48,7 @@ export async function getMySpecimens(userId?: string): Promise<SpecimenRow[]> {
        c."identityHue", c."acquiredDate", c."createdAt", c."updatedAt",
        c."tankName", c."lightPar", c."flowLevel",
        c."stage", c."acquiredStage", c."generationFromMother", c."sourceColony", c."vendor",
+       c.status, c."statusAt", c."statusNote", c."givenTo",
        (SELECT '/api/image?key=' || p."s3Key" FROM public."CoralPhoto" p WHERE p."coralId" = c.id ORDER BY CASE WHEN p.status = 'approved' THEN 0 ELSE 1 END, p."createdAt" ASC LIMIT 1) AS "coverPhotoUrl",
        (SELECT p.status = 'pending' FROM public."CoralPhoto" p WHERE p."coralId" = c.id ORDER BY CASE WHEN p.status = 'approved' THEN 0 ELSE 1 END, p."createdAt" ASC LIMIT 1) AS "coverPhotoPending"
      FROM public."Coral" c
@@ -155,11 +160,23 @@ export async function addSpecimenPhoto(data: {
 }): Promise<void> {
   const user = await getCurrentUser();
 
-  const { rows } = await pool.query<{ ownerId: string }>(
-    `SELECT "ownerId" FROM public."Coral" WHERE id = $1`,
+  // You may photograph a coral you own, and also an UNCLAIMED frag cut from a
+  // coral you own — the person holding a freshly cut plug is the parent's
+  // owner, and the frag is ownerless until claimed. Deliberately narrow: this
+  // grants nothing on someone else's claimed coral, and the permission lapses
+  // the moment the frag is claimed.
+  const { rows } = await pool.query<{ ownerId: string | null; parentOwnerId: string | null }>(
+    `SELECT c."ownerId", p."ownerId" AS "parentOwnerId"
+     FROM public."Coral" c
+     LEFT JOIN public."Lineage" l ON l."childId" = c.id
+     LEFT JOIN public."Coral" p ON p.id = l."parentId"
+     WHERE c.id = $1`,
     [data.specimenId]
   );
-  if (!rows[0] || rows[0].ownerId !== user.id) throw new Error('Not authorized');
+  const row = rows[0];
+  const ownsIt = row?.ownerId === user.id;
+  const ownsUnclaimedChild = row?.ownerId === null && row?.parentOwnerId === user.id;
+  if (!row || (!ownsIt && !ownsUnclaimedChild)) throw new Error('Not authorized');
 
   await pool.query(
     `INSERT INTO public."CoralPhoto" (id, "s3Key", url, "coralId", status, "createdAt")
@@ -191,6 +208,7 @@ export async function getPublicSpecimen(rfCodeOrId: string): Promise<SpecimenDet
        c."identityHue", c."acquiredDate", c."createdAt", c."updatedAt",
        c."tankName", c."lightPar", c."flowLevel",
        c."stage", c."acquiredStage", c."generationFromMother", c."sourceColony", c."vendor",
+       c.status, c."statusAt", c."statusNote", c."givenTo",
        c."ownerId",
        u.username AS "ownerUsername",
        u."displayName" AS "ownerDisplayName",
@@ -240,6 +258,7 @@ export async function getSpecimen(rfCodeOrId: string): Promise<SpecimenDetail | 
        c."identityHue", c."acquiredDate", c."createdAt", c."updatedAt",
        c."tankName", c."lightPar", c."flowLevel",
        c."stage", c."acquiredStage", c."generationFromMother", c."sourceColony", c."vendor",
+       c.status, c."statusAt", c."statusNote", c."givenTo",
        c."ownerId",
        u.username AS "ownerUsername",
        u."displayName" AS "ownerDisplayName",
@@ -341,13 +360,53 @@ export async function searchCoralNames(query: string): Promise<string[]> {
   return rows.map(r => r.name);
 }
 
-export async function deleteSpecimen(id: string): Promise<void> {
+export type CoralStatus = 'ALIVE' | 'LOST' | 'SOLD' | 'GIVEN';
+
+/**
+ * Removing a coral sets a lifecycle status rather than deleting the row.
+ *
+ * A hard DELETE used to cascade through Lineage and sever every descendant's
+ * parent link — silent, permanent provenance loss. The foreign keys are now
+ * RESTRICT, so a delete on a coral with lineage would fail outright anyway.
+ * Corals die; the record and its place in the chain should survive.
+ */
+export async function deleteSpecimen(
+  id: string,
+  status: Exclude<CoralStatus, 'ALIVE'> = 'LOST',
+  note?: string
+): Promise<void> {
+  const user = await getCurrentUser();
+
+  const res = await pool.query(
+    `UPDATE public."Coral"
+        SET status = $1::"CoralStatus", "statusAt" = NOW(), "statusNote" = $2, "updatedAt" = NOW()
+      WHERE id = $3 AND "ownerId" = $4`,
+    [status, note ?? null, id, user.id]
+  );
+  invariant('specimen.remove_matched_no_rows', res.rowCount === 1, { specimenId: id });
+
+  // Audit trail — the table existed unused for exactly this.
+  await pool.query(
+    `INSERT INTO public."CoralOwnershipEvent" (id, "coralId", "eventType", date, notes, "createdAt")
+     VALUES (gen_random_uuid()::text, $1, $2, NOW(), $3, NOW())`,
+    [id, status, note ?? null]
+  ).catch((err) => console.error('[specimens] ownership event failed:', err));
+
+  revalidatePath('/collection');
+  revalidatePath(`/collection/${id}`);
+}
+
+/** Bring a coral back to ALIVE — undo for an accidental removal. */
+export async function restoreSpecimen(id: string): Promise<void> {
   const user = await getCurrentUser();
   await pool.query(
-    'DELETE FROM public."Coral" WHERE id = $1 AND "ownerId" = $2',
+    `UPDATE public."Coral"
+        SET status = 'ALIVE'::"CoralStatus", "statusAt" = NULL, "statusNote" = NULL, "updatedAt" = NOW()
+      WHERE id = $1 AND "ownerId" = $2`,
     [id, user.id]
   );
   revalidatePath('/collection');
+  revalidatePath(`/collection/${id}`);
 }
 
 export type SitemapEntry = { path: string; updatedAt: string };

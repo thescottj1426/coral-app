@@ -113,6 +113,7 @@ export async function claimFrag(rfCode: string): Promise<{ coralId: string; cora
       `UPDATE public."Coral"
          SET "ownerId" = $1,
              "acquiredStage" = COALESCE("acquiredStage", stage),
+             "givenTo" = NULL,
              "updatedAt" = NOW()
        WHERE id = $2`,
       [user.id, fragRows[0].id]
@@ -186,24 +187,40 @@ export async function createFrags(
   parentId: string,
   count: number,
   opts?: { stage?: CoralStage; keepForSelf?: boolean }
-): Promise<string[]> {
+): Promise<Array<{ id: string; rfCode: string }> | { error: string }> {
   const user = await getCurrentUser();
 
+  // Look the parent up without the ownership filter so the failure can say
+  // something useful. "Not owned by you" is misleading for an unclaimed frag
+  // you cut yourself — it is yours, it just has no owner until it is claimed.
   const { rows: parentRows } = await pool.query<{
-    name: string; species: string | null; category: string | null; stage: CoralStage | null;
+    name: string; species: string | null; category: string | null;
+    stage: CoralStage | null; ownerId: string | null; rfCode: string | null;
   }>(
-    'SELECT name, species, category, stage FROM public."Coral" WHERE id = $1 AND "ownerId" = $2',
-    [parentId, user.id]
+    'SELECT name, species, category, stage, "ownerId", "rfCode" FROM public."Coral" WHERE id = $1',
+    [parentId]
   );
-  if (!parentRows[0]) throw new Error('Coral not found or not owned by you');
+  const found = parentRows[0];
+  if (!found) return { error: 'That coral no longer exists.' };
 
-  const parent = parentRows[0];
+  if (found.ownerId === null) {
+    return {
+      error:
+        `${found.rfCode ?? 'This frag'} has not been claimed yet, so it cannot be fragged. ` +
+        'Claim it first to add it to your collection.',
+    };
+  }
+  if (found.ownerId !== user.id) {
+    return { error: 'You can only cut frags from corals in your own collection.' };
+  }
+
+  const parent = found;
   const fragStage: CoralStage = opts?.stage ?? 'FRAG';
   // "Keep this one" — assign straight to the owner so cutting a frag off your
   // own frag doesn't require a self-claim detour through /claim.
   const ownerId = opts?.keepForSelf ? user.id : null;
 
-  const codes: string[] = [];
+  const created: Array<{ id: string; rfCode: string }> = [];
   const n = Math.min(Math.max(1, Math.floor(count)), 25);
 
   for (let i = 0; i < n; i++) {
@@ -231,11 +248,11 @@ export async function createFrags(
       [parentId, rows[0].id, parent.stage]
     );
 
-    codes.push(rfCode);
+    created.push({ id: rows[0].id, rfCode });
   }
 
   if (opts?.keepForSelf) revalidatePath('/collection');
-  return codes;
+  return created;
 }
 
 export async function claimParent(childId: string, parentRfCode: string): Promise<{ error?: string }> {
@@ -286,5 +303,37 @@ export async function claimParent(childId: string, parentRfCode: string): Promis
 
   revalidatePath(`/collection/${childId}/pedigree`);
   revalidatePath(`/collection/${parentRfCode}/pedigree`);
+  return {};
+}
+
+/**
+ * Note who received a frag, before anyone claims it. Same authorisation shape
+ * as photographing one: the parent's owner may annotate an unclaimed child.
+ * Cleared on claim, since the real owner supersedes the note.
+ */
+export async function setFragRecipient(coralId: string, recipient: string): Promise<{ error?: string }> {
+  const user = await getCurrentUser();
+
+  const { rows } = await pool.query<{ ownerId: string | null; parentOwnerId: string | null }>(
+    `SELECT c."ownerId", p."ownerId" AS "parentOwnerId"
+     FROM public."Coral" c
+     LEFT JOIN public."Lineage" l ON l."childId" = c.id
+     LEFT JOIN public."Coral" p ON p.id = l."parentId"
+     WHERE c.id = $1`,
+    [coralId]
+  );
+  const row = rows[0];
+  if (!row) return { error: 'Coral not found' };
+
+  const ownsIt = row.ownerId === user.id;
+  const ownsUnclaimedChild = row.ownerId === null && row.parentOwnerId === user.id;
+  if (!ownsIt && !ownsUnclaimedChild) return { error: 'Not authorized' };
+
+  const value = recipient.trim();
+  await pool.query(
+    `UPDATE public."Coral" SET "givenTo" = $1, "updatedAt" = NOW() WHERE id = $2`,
+    [value || null, coralId]
+  );
+  revalidatePath(`/coral/${coralId}`);
   return {};
 }

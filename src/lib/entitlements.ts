@@ -29,7 +29,10 @@ export async function checkSpecimenCap(user: PlanContext): Promise<CapCheck> {
   if (cap === null) return { ok: true };
 
   const { rows } = await pool.query<{ n: number }>(
-    'SELECT COUNT(*)::int AS n FROM public."Coral" WHERE "ownerId" = $1',
+    // Lost/sold corals stay in the record and in the lineage graph, but they
+    // are not part of a living collection, so they do not consume a slot.
+    `SELECT COUNT(*)::int AS n FROM public."Coral"
+      WHERE "ownerId" = $1 AND status = 'ALIVE'::"CoralStatus"`,
     [user.id]
   );
   if (rows[0].n < cap) return { ok: true };
