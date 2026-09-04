@@ -55,8 +55,10 @@ jobs:
   # the only way path-separator and CRLF bugs surface before they reach a
   # laptop. ubuntu-latest is what Vercel actually builds on.
   #
-  # Node 20 is the floor Next 16 declares (engines: >=20.9.0); 18 is EOL and
-  # would fail install. 24 is the forward check.
+  # Node 22 is the floor: jsdom 30 requires ^22.22.2 || ^24.15.0 || >=26, and
+  # Node 20 went end-of-life in April 2026. Next 16 still nominally allows
+  # 20.9, but pinning jsdom back to keep a dead runtime green is the wrong
+  # trade. 24 is the forward check.
   unit:
     name: Guard + component tests
     runs-on: ${{ matrix.os }}
@@ -66,7 +68,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        node-version: [20, 22, 24]
+        node-version: [22, 24]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
