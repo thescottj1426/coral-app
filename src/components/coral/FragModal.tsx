@@ -7,17 +7,14 @@ import {
   Group,
   Button,
   Paper,
-  CopyButton,
-  ActionIcon,
   Divider,
   ThemeIcon,
   Badge,
   ScrollArea,
   Loader,
   Select,
-  Checkbox,
 } from '@mantine/core';
-import { IconCopy, IconCheck, IconLeaf, IconScissors, IconPlus, IconLink } from '@tabler/icons-react';
+import { IconLeaf, IconScissors, IconPlus } from '@tabler/icons-react';
 import { useState, useTransition } from 'react';
 import { CoralThumb } from './CoralThumb';
 import { notifications } from '@mantine/notifications';
@@ -48,17 +45,16 @@ export function FragModal({ opened, onClose, parentId, parentRfCode, parentName,
   const newGeneration = parentGeneration + 1;
   const [frags, setFrags] = useState<LoggedFrag[]>([]);
   const [stage, setStage] = useState<CoralStage>('FRAG');
-  const [keepForSelf, setKeepForSelf] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  function addFrag() {
+  function addFrag(keepForSelf: boolean) {
     startTransition(async () => {
       const created = await createFrags(parentId, 1, { stage, keepForSelf });
       if ('error' in created) {
         notifications.show({ title: 'Could not log frag', message: created.error, color: 'red' });
         return;
       }
-      setFrags((prev) => [...prev, ...created]);
+      setFrags((prev) => [...prev, ...created.map((f) => ({ ...f, kept: keepForSelf }))]);
     });
   }
 
@@ -143,35 +139,46 @@ export function FragModal({ opened, onClose, parentId, parentRfCode, parentName,
           )}
         </Stack>
 
-        {/* What is being cut, and whether it stays with you */}
-        <Stack gap="sm">
-          <Select
-            label="Frag size"
-            description="The size of the new plug, not the colony it came from."
-            data={CORAL_STAGES.map(o => ({ value: o.value, label: o.label }))}
-            value={stage}
-            onChange={(v) => v && setStage(v as CoralStage)}
-            allowDeselect={false}
-            size="sm"
-          />
-          <Checkbox
-            label="Keep this one — add it straight to my collection"
-            description="Skips the claim step. Use when you are fragging to grow out yourself."
-            checked={keepForSelf}
-            onChange={(e) => setKeepForSelf(e.currentTarget.checked)}
-          />
-        </Stack>
+        <Select
+          label="Frag size"
+          description="The size of the new plug, not the colony it came from."
+          data={CORAL_STAGES.map(o => ({ value: o.value, label: o.label }))}
+          value={stage}
+          onChange={(v) => v && setStage(v as CoralStage)}
+          allowDeselect={false}
+          size="sm"
+        />
 
-        {/* Add frag */}
-        <Button
-          variant="light"
-          leftSection={<IconPlus size={14} />}
-          onClick={addFrag}
-          loading={isPending}
-          fullWidth
-        >
-          {keepForSelf ? 'Log a frag and keep it' : 'Log a frag'}
-        </Button>
+        {/* Disposition is decided per plug, not once for the whole session —
+            one cutting usually produces some you keep and some you hand out. */}
+        <Stack gap={6}>
+          <Text style={EYEBROW}>log a frag as…</Text>
+          <Group grow gap="sm">
+            <Button
+              variant="light"
+              color="ocean"
+              leftSection={<IconPlus size={14} />}
+              onClick={() => addFrag(false)}
+              loading={isPending}
+            >
+              For a customer
+            </Button>
+            <Button
+              variant="light"
+              color="teal"
+              leftSection={<IconPlus size={14} />}
+              onClick={() => addFrag(true)}
+              loading={isPending}
+            >
+              Keep it
+            </Button>
+          </Group>
+          <Text size="xs" c="dimmed">
+            <strong>For a customer</strong> leaves it unclaimed so whoever gets the plug can claim
+            the code. <strong>Keep it</strong> puts it straight in your collection — ready to frag
+            again, no claiming needed.
+          </Text>
+        </Stack>
 
         <Divider />
 
