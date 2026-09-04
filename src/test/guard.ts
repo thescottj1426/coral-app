@@ -2,8 +2,13 @@ import { readFileSync } from 'node:fs';
 
 /**
  * The feature suite TRUNCATEs. Pointed at the wrong branch it would destroy the
- * real collection, so a test database has to prove it is disposable before any
- * test runs. Fails closed: anything unrecognised is treated as real data.
+ * real collection, so a test database is checked before any test runs.
+ *
+ * This is a DENYLIST, not an allowlist: an endpoint that is not listed below is
+ * permitted. That is deliberate — CI cuts a fresh Neon branch per run and its
+ * endpoint id cannot be known in advance. The cost is that a newly created
+ * durable branch is unprotected until someone adds it here by hand, so add the
+ * endpoint at the same time you create the branch.
  */
 
 // Branches holding real data. A test connection resolving to any of these host

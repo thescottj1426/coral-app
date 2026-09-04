@@ -12,9 +12,12 @@ export const metadata: Metadata = {
 };
 
 export default async function ExplorePage() {
+  // This page is statically generated, so these run at build time. Unguarded,
+  // a database blip fails the whole deploy — and CI cannot build at all
+  // without a connection string. Fall back to empty; ISR refills within 60s.
   const [specimens, collectors] = await Promise.all([
-    getExploreSpecimens(),
-    getExploreCollectors(),
+    getExploreSpecimens().catch(() => []),
+    getExploreCollectors().catch(() => []),
   ]);
 
   return <ExploreClient specimens={specimens} collectors={collectors} />;

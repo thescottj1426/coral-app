@@ -1,0 +1,86 @@
+name: CI
+
+# Push to main reports after the fact — Vercel has already started deploying by
+# then. A scratch branch stays silent until a PR is opened. Restricting push to
+# main avoids double runs when a branch with an open PR is pushed to.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A new push to the same branch cancels the previous run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Typecheck, lint, unit tests, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      # No DATABASE_URL here on purpose: the build must not depend on the
+      # database being reachable. Build-time queries fall back to empty.
+      - name: Build
+        run: npm run build
+
+  feature:
+    name: Feature tests (real database)
+    runs-on: ubuntu-latest
+    # Skipped on forks, which cannot read secrets.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # A throwaway branch per run. Its endpoint id is new, so guard.ts accepts
+      # it, and nothing durable is ever truncated.
+      #
+      # `parent` is load-bearing: production is the project's DEFAULT branch, so
+      # omitting this clones real user data into the branch the tests truncate,
+      # in a public repo's logs.
+      - name: Create Neon branch
+        id: neon
+        uses: neondatabase/create-branch-action@v5
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          parent: staging
+          branch_name: ci-${{ github.run_id }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Feature tests
+        run: npm run test:feature
+        env:
+          TEST_DATABASE_URL: ${{ steps.neon.outputs.db_url_pooled }}
+
+      # always() so a failed test still cleans up its branch.
+      - name: Delete Neon branch
+        if: always()
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          branch: ci-${{ github.run_id }}
+          api_key: ${{ secrets.NEON_API_KEY }}
