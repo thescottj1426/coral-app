@@ -53,8 +53,14 @@ export const auth = betterAuth({
               );
               await sendEmail(user.email, `Welcome to Coral Chest`, welcomeTemplate(username));
               break;
-            } catch (e: any) {
-              if (e.constraint === 'User_username_key') {
+            } catch (e) {
+              // Postgres surfaces the violated index in `constraint`; a retry
+              // with a suffixed username is only right for that one.
+              const constraint =
+                typeof e === 'object' && e !== null && 'constraint' in e
+                  ? (e as { constraint?: string }).constraint
+                  : undefined;
+              if (constraint === 'User_username_key') {
                 username = baseUsername + '_' + Math.random().toString(36).slice(2, 5);
               } else {
                 throw e;

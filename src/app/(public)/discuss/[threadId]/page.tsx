@@ -10,6 +10,7 @@ import { auth } from '@/lib/auth';
 import { coralIdentityGradient } from '@/theme/theme';
 import { TypeBadge, ResolvedBadge } from '@/components/discussion/TypeBadge';
 import { AnchorCard } from '@/components/discussion/AnchorCard';
+import type { AnchorType } from '@/lib/anchorTypes';
 import { ReplyItem } from '@/components/discussion/ReplyItem';
 import { ReplyComposer } from '@/components/discussion/ReplyComposer';
 
@@ -85,7 +86,7 @@ export default async function PublicThreadPage({ params }: Props) {
 
           {/* Anchor card */}
           <AnchorCard
-            anchorType={thread.anchorType as any}
+            anchorType={thread.anchorType as AnchorType}
             name={anchorName ?? thread.anchorName ?? thread.anchorId}
             code={thread.anchorRfCode ?? null}
             identityHue={thread.anchorIdentityHue ?? null}

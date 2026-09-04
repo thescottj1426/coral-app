@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useSyncExternalStore } from 'react';
 import { Modal, Stack, Text, Center, Button, CopyButton } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconQrcode, IconCheck, IconCopy } from '@tabler/icons-react';
@@ -11,18 +11,31 @@ interface Props {
   variant?: 'icon' | 'button';
 }
 
+// The origin never changes for the life of the page, so there is nothing to
+// subscribe to; the store exists only to keep server and client snapshots apart.
+const subscribeToNothing = () => () => {};
+const getOrigin = () => window.location.origin;
+const getServerOrigin = () => '';
+
 export function RfCodeQr({ rfCode, variant = 'icon' }: Props) {
   const [opened, { open, close }] = useDisclosure(false);
   const [dataUrl, setDataUrl] = useState<string>('');
-  const [shareUrl, setShareUrl] = useState<string>('');
+  // window is unavailable on the server, so the origin is read through a store
+  // that returns '' during SSR and the real value once hydrated.
+  const origin = useSyncExternalStore(subscribeToNothing, getOrigin, getServerOrigin);
+
+  const shareUrl = origin ? `${origin}/coral/${rfCode}` : '';
 
   useEffect(() => {
-    if (!opened) return;
-    const origin = window.location.origin;
-    const url = `${origin}/coral/${rfCode}`;
-    setShareUrl(url);
-    QRCode.toDataURL(url, { width: 240, margin: 2 }).then(setDataUrl);
-  }, [opened, rfCode]);
+    if (!opened || !shareUrl) return;
+    let cancelled = false;
+    QRCode.toDataURL(shareUrl, { width: 240, margin: 2 }).then((url) => {
+      if (!cancelled) setDataUrl(url);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [opened, shareUrl]);
 
   return (
     <>

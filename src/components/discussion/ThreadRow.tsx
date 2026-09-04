@@ -11,17 +11,20 @@ interface Props {
   specimenSlug?: string;
 }
 
+/** Clock read lives outside the component so rendering stays pure. */
+function relativeTime(updatedAt: string | Date): string {
+  const diff = Date.now() - new Date(updatedAt).getTime();
+  const h = Math.floor(diff / 3600000);
+  const d = Math.floor(diff / 86400000);
+  if (h < 1) return 'just now';
+  if (h < 24) return `${h}h ago`;
+  return `${d}d ago`;
+}
+
 export function ThreadRow({ thread, specimenSlug }: Props) {
   const solved = thread.resolved;
 
-  const timeAgo = (() => {
-    const diff = Date.now() - new Date(thread.updatedAt).getTime();
-    const h = Math.floor(diff / 3600000);
-    const d = Math.floor(diff / 86400000);
-    if (h < 1) return 'just now';
-    if (h < 24) return `${h}h ago`;
-    return `${d}d ago`;
-  })();
+  const timeAgo = relativeTime(thread.updatedAt);
 
   return (
     <Link

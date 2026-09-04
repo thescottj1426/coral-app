@@ -91,7 +91,7 @@ export default async function UserProfilePage({
   ];
 
   // ── Collection card ──────────────────────────────────────────
-  function CollectionCard() {
+  function collectionCard() {
     const shown = specimens.slice(0, 6);
     return (
       <Paper withBorder style={{ overflow: 'hidden' }}>
@@ -134,7 +134,7 @@ export default async function UserProfilePage({
   }
 
   // ── Bloodlines card ──────────────────────────────────────────
-  function BloodlinesCard() {
+  function bloodlinesCard() {
     return (
       <Paper withBorder>
         <Group justify="space-between" align="center" px="md" pt="md" pb={10}>
@@ -174,7 +174,7 @@ export default async function UserProfilePage({
   }
 
   // ── About card ───────────────────────────────────────────────
-  function AboutCard() {
+  function aboutCard() {
     if (!p.bio && (!p.specialty || p.specialty.length === 0)) return null;
     return (
       <Paper withBorder p="md">
@@ -196,7 +196,7 @@ export default async function UserProfilePage({
   }
 
   // ── Seller card ──────────────────────────────────────────────
-  function SellerCard() {
+  function sellerCard() {
     if (!p.isSeller) return null;
     return (
       <Paper withBorder p="md" style={{ background: 'var(--mantine-color-ocean-0)', borderColor: 'var(--mantine-color-ocean-1)' }}>
@@ -212,7 +212,7 @@ export default async function UserProfilePage({
   }
 
   // ── Category breakdown card ──────────────────────────────────
-  function CategoryCard() {
+  function categoryCard() {
     const entries = Object.entries(p.categoryBreakdown);
     if (entries.length === 0) return null;
     return (
@@ -235,14 +235,14 @@ export default async function UserProfilePage({
     <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" style={{ alignItems: 'start' }}>
       {/* left column */}
       <Stack gap="md">
-        <CollectionCard />
-        <BloodlinesCard />
+        {collectionCard()}
+        {bloodlinesCard()}
       </Stack>
       {/* right column */}
       <Stack gap="md">
-        <AboutCard />
-        <SellerCard />
-        <CategoryCard />
+        {aboutCard()}
+        {sellerCard()}
+        {categoryCard()}
       </Stack>
     </SimpleGrid>
   );
