@@ -15,9 +15,13 @@ concurrency:
 
 # One job per check so the run graph names the failure. They repeat their
 # setup because Actions has no YAML anchors and a composite action would be
-# more indirection than four identical five-line preambles are worth. The npm
-# cache makes the repeat cheap, and they run in parallel, so wall-clock is
-# lower than the single combined job it replaced.
+# more indirection than four identical five-line preambles are worth; the npm
+# cache makes the repeat cheap.
+#
+# The jobs are independent on purpose: they all start at once, so a run costs
+# about as long as its slowest job. (`needs:` between them would draw a staged
+# left-to-right graph and fail fast, at the cost of roughly doubling wall
+# clock. Not worth it while the whole run is under two minutes.)
 jobs:
   typecheck:
     name: Typecheck
@@ -43,14 +47,31 @@ jobs:
       - run: npm ci
       - run: npm run lint
 
+  # The matrix lives here rather than on every job: the unit suite is ~1s, so
+  # fanning it out is nearly free, while a 6-cell build or a 6-cell database
+  # job would be six npm installs and six Neon branches for no new signal.
+  #
+  # windows-latest because that is what this project is developed on, and it is
+  # the only way path-separator and CRLF bugs surface before they reach a
+  # laptop. ubuntu-latest is what Vercel actually builds on.
+  #
+  # Node 20 is the floor Next 16 declares (engines: >=20.9.0); 18 is EOL and
+  # would fail install. 24 is the forward check.
   unit:
     name: Unit tests
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # One red cell should not cancel the others — knowing it fails on Node 24
+      # everywhere is different information from it failing only on Windows.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node-version: [20, 22, 24]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: ${{ matrix.node-version }}
           cache: npm
       - run: npm ci
       - run: npm test
