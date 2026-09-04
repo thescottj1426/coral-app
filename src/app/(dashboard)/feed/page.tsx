@@ -198,17 +198,6 @@ function RightRail() {
         <Button component="a" href="/explore" variant="light" size="xs" fullWidth>Explore keepers</Button>
       </Paper>
 
-      <Paper withBorder p="md">
-        <Group gap={8} mb={10}>
-          <IconMessageCircle size={16} color="var(--mantine-color-ocean-6)" />
-          <Text fw={600} size="sm">Community discussions</Text>
-        </Group>
-        <Text size="xs" c="dimmed" mb={12} style={{ lineHeight: 1.6 }}>
-          Ask questions, share tips, and talk frags with other hobbyists.
-        </Text>
-        <Button component="a" href="/discuss" variant="light" size="xs" fullWidth>Go to Discuss</Button>
-      </Paper>
-
       <Text size="xs" c="dimmed" px={4} style={{ lineHeight: 1.7 }}>
         Polyp © 2026
       </Text>

@@ -197,7 +197,6 @@ export type SpecimenDetail = SpecimenRow & {
   fragsGiven: number;
   generationsBack: number;
   photoCount: number;
-  threadCount: number;
   photos: Array<{ id: string; url: string; s3Key: string; status: string; createdAt: string }>;
 };
 
@@ -214,7 +213,7 @@ export async function getPublicSpecimen(rfCodeOrId: string): Promise<SpecimenDet
        u."displayName" AS "ownerDisplayName",
        false AS "isOwner",
        NULL AS "coverPhotoUrl",
-       0 AS "fragsGiven", 0 AS "generationsBack", 0 AS "photoCount", 0 AS "threadCount",
+       0 AS "fragsGiven", 0 AS "generationsBack", 0 AS "photoCount",
        COALESCE(
          json_agg(
            json_build_object('id', p.id, 'url', '/api/image?key=' || p."s3Key", 's3Key', p."s3Key", 'status', p.status, 'createdAt', p."createdAt")
@@ -271,7 +270,6 @@ export async function getSpecimen(rfCodeOrId: string): Promise<SpecimenDetail | 
          SELECT l."parentId" FROM public."Lineage" l JOIN anc ON l."childId" = anc."parentId"
        ) SELECT COUNT(*)::int FROM anc) AS "generationsBack",
        (SELECT COUNT(*)::int FROM public."CoralPhoto" WHERE "coralId" = c.id) AS "photoCount",
-       (SELECT COUNT(*)::int FROM public."Thread" WHERE "anchorType" = 'specimen' AND "anchorId" = c.id::text) AS "threadCount",
        COALESCE(
          json_agg(
            json_build_object('id', p.id, 'url', '/api/image?key=' || p."s3Key", 's3Key', p."s3Key", 'status', p.status, 'createdAt', p."createdAt")

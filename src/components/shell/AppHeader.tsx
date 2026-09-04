@@ -20,15 +20,11 @@ import { useMantineColorScheme } from '@mantine/core';
 import { signOut, useSession } from '@/lib/auth-client';
 import { useEffect, useState } from 'react';
 import { coralIdentityGradient } from '@/theme/theme';
+import { NAV_ITEMS } from '@/lib/nav';
 import { NotificationBell } from './NotificationBell';
 import styles from './shell.module.css';
 
-const NAV_TABS = [
-  { label: 'Collect',  href: '/collection' },
-  { label: 'Explore',  href: '/explore' },
-  { label: 'Discuss',  href: '/discuss' },
-  { label: 'Feed',     href: '/feed' },
-];
+const NAV_TABS = NAV_ITEMS;
 
 export function AppHeader() {
   const pathname = usePathname();

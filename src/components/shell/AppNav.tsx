@@ -6,7 +6,6 @@ import {
   IconSeeding,
   IconCompass,
   IconRss,
-  IconMessageCircle,
 } from '@tabler/icons-react';
 import styles from './shell.module.css';
 import { NAV_ITEMS } from '@/lib/nav';
@@ -16,7 +15,6 @@ import { NAV_ITEMS } from '@/lib/nav';
 const ICONS = {
   '/collection': IconSeeding,
   '/explore': IconCompass,
-  '/discuss': IconMessageCircle,
   '/feed': IconRss,
 } as const;
 

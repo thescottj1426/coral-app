@@ -7,7 +7,6 @@ import { IconArrowRight } from '@tabler/icons-react';
 import { getSpecimen, getMoreByOwner } from '@/app/actions/specimens';
 import { getLineage, getChildren } from '@/app/actions/lineage';
 import { CategoryBadge } from '@/components/specimen/CategoryBadge';
-import { DiscussionSection } from '@/components/discussion/DiscussionSection';
 import { coralIdentityGradient } from '@/theme/theme';
 import {
   MetaStripActions,
@@ -247,10 +246,6 @@ export default async function SpecimenDetailPage({ params }: Props) {
             <span className={styles.recordValue}>{specimen.photoCount}</span>
           </div>
           <div className={styles.recordRow}>
-            <span className={styles.recordLabel}>Threads</span>
-            <span className={styles.recordValue}>{specimen.threadCount}</span>
-          </div>
-          <div className={styles.recordRow}>
             <span className={styles.recordLabel}>Last updated</span>
             <span className={styles.recordValue}>{updatedLabel}</span>
           </div>
@@ -371,16 +366,6 @@ export default async function SpecimenDetailPage({ params }: Props) {
               </div>
             </div>
           )}
-
-          {/* Discussions */}
-          <div className={styles.card} id="discuss">
-            <DiscussionSection
-              specimenId={specimen.id}
-              specimenRfCode={specimen.rfCode}
-              specimenName={specimen.name}
-              specimenIdentityHue={specimen.identityHue}
-            />
-          </div>
         </div>
 
       </div>

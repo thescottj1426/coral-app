@@ -85,7 +85,6 @@ function KpiRow({ stats }: { stats: DashboardStats }) {
     { value: stats.coralCount, label: 'corals' },
     { value: stats.fragsProduced, label: 'frags given' },
     { value: stats.fragsReceived, label: 'frags received' },
-    { value: stats.threadCount, label: 'threads' },
   ];
   return (
     <Paper withBorder p="sm" mb="md">

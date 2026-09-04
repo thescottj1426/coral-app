@@ -6,7 +6,6 @@ export type DashboardStats = {
   coralCount: number;
   fragsProduced: number;
   fragsReceived: number;
-  threadCount: number;
 };
 
 export type DashboardCoral = {
@@ -36,8 +35,7 @@ export async function getDashboardStats(userId: string): Promise<DashboardStats>
        (SELECT COUNT(*)::int FROM public."Lineage" l
         JOIN public."Coral" c ON c.id = l."parentId" WHERE c."ownerId" = $1) AS "fragsProduced",
        (SELECT COUNT(*)::int FROM public."Lineage" l
-        JOIN public."Coral" c ON c.id = l."childId" WHERE c."ownerId" = $1) AS "fragsReceived",
-       (SELECT COUNT(*)::int FROM public."Thread" WHERE "authorId" = $1) AS "threadCount"`,
+        JOIN public."Coral" c ON c.id = l."childId" WHERE c."ownerId" = $1) AS "fragsReceived"`,
     [userId]
   );
   return rows[0];
