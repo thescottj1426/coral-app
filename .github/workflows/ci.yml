@@ -71,6 +71,14 @@ jobs:
           branch_name: ci-${{ github.run_id }}
           api_key: ${{ secrets.NEON_API_KEY }}
 
+      # The branch inherits whatever schema staging happens to have. Migrations
+      # are additive and idempotent, so running them here keeps the suite from
+      # depending on staging being up to date.
+      - name: Migrate the branch
+        run: node scripts/migrate-ownership-events.mjs
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+
       - name: Feature tests
         run: npm run test:feature
         env:

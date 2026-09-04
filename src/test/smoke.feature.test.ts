@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import { testPool, truncateAll, TEST_DATABASE_URL } from './db';
+import { assertDisposableDatabase } from './guard';
 import { seedUser, seedCoral, resetSequence } from './factories';
 
 describe('feature harness', () => {
@@ -12,8 +13,11 @@ describe('feature harness', () => {
     await testPool.end();
   });
 
-  it('is pointed at the disposable test branch', () => {
-    expect(TEST_DATABASE_URL).toContain('ep-still-cloud-aikozhcu');
+  // CI cuts a fresh branch per run, so the endpoint cannot be pinned. What
+  // matters is that the guard let this connection through — every protected
+  // endpoint would have thrown before any test ran.
+  it('is pointed at a database the guard accepts', () => {
+    expect(assertDisposableDatabase(TEST_DATABASE_URL)).toBe(TEST_DATABASE_URL);
   });
 
   it('starts each test with empty owned tables', async () => {
