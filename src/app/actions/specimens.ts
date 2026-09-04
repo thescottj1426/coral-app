@@ -385,20 +385,34 @@ export async function deleteSpecimen(
   );
   invariant('specimen.remove_matched_no_rows', res.rowCount === 1, { specimenId: id });
 
-  // Audit trail — the table existed unused for exactly this.
-  await pool.query(
+  // CoralStatus and CoralEventType are different enums that overlap only on
+  // SOLD: there is no LOST event, and GIVEN is spelled GIFTED. Writing the
+  // status straight into "eventType" made every LOST/GIVEN insert fail.
+  const eventType = status === 'SOLD' ? 'SOLD' : status === 'GIVEN' ? 'GIFTED' : 'OBSERVATION';
+
+  const audit = await pool.query(
     `INSERT INTO public."CoralOwnershipEvent" (id, "coralId", "eventType", date, notes, "createdAt")
-     VALUES (gen_random_uuid()::text, $1, $2, NOW(), $3, NOW())`,
-    [id, status, note ?? null]
-  ).catch((err) => console.error('[specimens] ownership event failed:', err));
+     VALUES (gen_random_uuid()::text, $1, $2::"CoralEventType", NOW(), $3, NOW())`,
+    [id, eventType, note ?? `Marked ${status.toLowerCase()}`]
+  );
+  invariant('specimen.ownership_event_not_written', audit.rowCount === 1, {
+    specimenId: id,
+    status,
+  });
 
   revalidatePath('/collection');
   revalidatePath(`/collection/${id}`);
 }
 
 /** Bring a coral back to ALIVE — undo for an accidental removal. */
-export async function restoreSpecimen(id: string): Promise<void> {
+export async function restoreSpecimen(id: string): Promise<{ error?: string }> {
   const user = await getCurrentUser();
+
+  // checkSpecimenCap counts only ALIVE corals, so restoring adds one back to
+  // the living collection. Refuse rather than silently exceeding the limit.
+  const cap = await checkSpecimenCap(user);
+  if (!cap.ok) return { error: cap.error };
+
   await pool.query(
     `UPDATE public."Coral"
         SET status = 'ALIVE'::"CoralStatus", "statusAt" = NULL, "statusNote" = NULL, "updatedAt" = NOW()
@@ -407,6 +421,7 @@ export async function restoreSpecimen(id: string): Promise<void> {
   );
   revalidatePath('/collection');
   revalidatePath(`/collection/${id}`);
+  return {};
 }
 
 export type SitemapEntry = { path: string; updatedAt: string };

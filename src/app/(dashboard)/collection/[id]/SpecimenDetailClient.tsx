@@ -11,7 +11,7 @@ import {
   IconShare,
   IconLeaf,
   IconEdit,
-  IconTrash,
+  IconArchive, IconArrowBackUp,
   IconScissors,
   IconTag,
   IconCamera,
@@ -24,7 +24,8 @@ import { FragModal } from '@/components/specimen/FragModal';
 import { EditSpecimenModal } from '@/components/specimen/EditSpecimenModal';
 import { ListFragModal } from '@/components/specimen/ListFragModal';
 import { PhotoLightbox } from '@/components/specimen/PhotoLightbox';
-import { deleteSpecimen, addSpecimenPhoto } from '@/app/actions/specimens';
+import { restoreSpecimen, addSpecimenPhoto } from '@/app/actions/specimens';
+import { RemoveSpecimenModal } from '@/components/specimen/RemoveSpecimenModal';
 import type { SpecimenDetail } from '@/app/actions/specimens';
 
 interface Props {
@@ -38,10 +39,21 @@ export function MetaStripActions({ specimen, isOwner }: Props) {
   const [fragOpened, { open: openFrag, close: closeFrag }] = useDisclosure(false);
   const [listOpened, { open: openList, close: closeList }] = useDisclosure(false);
 
-  async function handleDelete() {
-    if (!confirm(`Delete "${specimen.name}"? This cannot be undone.`)) return;
-    await deleteSpecimen(specimen.id);
-    router.push('/collection');
+  const [removeOpened, { open: openRemove, close: closeRemove }] = useDisclosure(false);
+  const removed = specimen.status !== 'ALIVE';
+
+  async function handleRestore() {
+    const res = await restoreSpecimen(specimen.id);
+    if (res.error) {
+      notifications.show({ title: 'Could not restore', message: res.error, color: 'red' });
+      return;
+    }
+    notifications.show({
+      title: 'Restored',
+      message: `${specimen.name} is back in your collection.`,
+      color: 'teal',
+    });
+    router.refresh();
   }
 
   if (!isOwner) return null;
@@ -61,6 +73,12 @@ export function MetaStripActions({ specimen, isOwner }: Props) {
         onClose={closeList}
         coralId={specimen.id}
         coralName={specimen.name}
+      />
+      <RemoveSpecimenModal
+        opened={removeOpened}
+        onClose={closeRemove}
+        specimenId={specimen.id}
+        specimenName={specimen.name}
       />
       <Group gap="xs" ml="auto">
         <Button
@@ -89,15 +107,27 @@ export function MetaStripActions({ specimen, isOwner }: Props) {
         >
           Pedigree
         </Button>
-        <Button
-          variant="light"
-          color="red"
-          size="xs"
-          leftSection={<IconTrash size={12} />}
-          onClick={handleDelete}
-        >
-          Delete
-        </Button>
+        {removed ? (
+          <Button
+            variant="light"
+            color="teal"
+            size="xs"
+            leftSection={<IconArrowBackUp size={12} />}
+            onClick={handleRestore}
+          >
+            Restore to collection
+          </Button>
+        ) : (
+          <Button
+            variant="light"
+            color="gray"
+            size="xs"
+            leftSection={<IconArchive size={12} />}
+            onClick={openRemove}
+          >
+            Remove
+          </Button>
+        )}
       </Group>
     </>
   );

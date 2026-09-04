@@ -16,7 +16,7 @@ import {
   AddPhotoButton,
 } from './SpecimenDetailClient';
 import { RfCodeQr } from '@/components/specimen/RfCodeQr';
-import { stageLabel, effectiveGeneration } from '@/lib/coralStage';
+import { stageLabel, effectiveGeneration, statusLabel } from '@/lib/coralStage';
 import styles from './specimen.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -157,6 +157,16 @@ export default async function SpecimenDetailPage({ params }: Props) {
               @{specimen.ownerUsername}
             </Link>
           </div>
+          {statusLabel(specimen.status) && (
+            <div className={styles.recordRow}>
+              <span className={styles.recordLabel}>Status</span>
+              <span className={styles.recordValue}>
+                {statusLabel(specimen.status)}
+                {specimen.statusAt && ` · ${new Date(specimen.statusAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`}
+                {specimen.statusNote && ` — ${specimen.statusNote}`}
+              </span>
+            </div>
+          )}
           {specimen.stage && (
             <div className={styles.recordRow}>
               <span className={styles.recordLabel}>Stage</span>

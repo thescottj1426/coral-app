@@ -17,6 +17,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { CategoryBadge } from '@/components/specimen/CategoryBadge';
+import { statusLabel, statusColor } from '@/lib/coralStage';
 import { SpecimenThumb } from '@/components/specimen/SpecimenThumb';
 import { AddSpecimenDrawer } from '@/components/specimen/AddSpecimenDrawer';
 import { createSpecimen, type SpecimenRow, type CoralStage } from '@/app/actions/specimens';
@@ -27,9 +28,12 @@ import type { DashboardStats, MyListing } from '@/app/actions/dashboard';
 
 function SpecimenCard({ specimen }: { specimen: SpecimenRow }) {
   const thumb = specimen.rfCode ?? specimen.id;
+  // Removed corals are dimmed, never hidden — vanishing is what makes people
+  // think the record was destroyed, which is the misconception this fixes.
+  const removedLabel = statusLabel(specimen.status);
   return (
     <Link href={`/collection/${specimen.rfCode ?? specimen.id}`} className={styles.card}>
-      <Paper withBorder style={{ overflow: 'hidden' }}>
+      <Paper withBorder style={{ overflow: 'hidden', opacity: removedLabel ? 0.55 : 1 }}>
         <div className={styles.photoWrap}>
           {specimen.coverPhotoUrl ? (
             <Image
@@ -44,6 +48,13 @@ function SpecimenCard({ specimen }: { specimen: SpecimenRow }) {
             <div className={styles.thumb} style={{ width: '100%', height: '100%' }}>
               <SpecimenThumb rfCode={thumb} size={0} style={{ width: '100%', height: '100%', borderRadius: 0 }} />
             </div>
+          )}
+          {removedLabel && (
+            <Box style={{ position: 'absolute', top: 8, left: 8, zIndex: 1 }}>
+              <Badge size="xs" color={statusColor(specimen.status)} variant="filled" radius="sm">
+                {removedLabel}
+              </Badge>
+            </Box>
           )}
           {specimen.coverPhotoPending && (
             <Box style={{ position: 'absolute', top: 8, right: 8, zIndex: 1 }}>

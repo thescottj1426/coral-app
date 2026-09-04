@@ -23,3 +23,25 @@ export function effectiveGeneration(
 ): number {
   return (rootGenerationFromMother ?? 0) + inAppDepth;
 }
+
+import type { CoralStatus } from '@/app/actions/specimens';
+
+const STATUS_LABELS: Record<CoralStatus, string> = {
+  ALIVE: 'Alive',
+  LOST: 'Lost',
+  SOLD: 'Sold',
+  GIVEN: 'Given away',
+};
+
+/** null for ALIVE — a living coral needs no badge. */
+export function statusLabel(status: CoralStatus | null | undefined): string | null {
+  if (!status || status === 'ALIVE') return null;
+  return STATUS_LABELS[status] ?? status;
+}
+
+export function statusColor(status: CoralStatus | null | undefined): string {
+  if (status === 'LOST') return 'gray';
+  if (status === 'SOLD') return 'grape';
+  if (status === 'GIVEN') return 'teal';
+  return 'gray';
+}

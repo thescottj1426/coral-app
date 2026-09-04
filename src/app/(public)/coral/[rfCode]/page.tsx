@@ -6,7 +6,7 @@ import { getLineage, getChildren } from '@/app/actions/lineage';
 import { CategoryBadge } from '@/components/specimen/CategoryBadge';
 import { coralIdentityGradient } from '@/theme/theme';
 import { CtaBanner } from '@/components/coral/CtaBanner';
-import { stageLabel } from '@/lib/coralStage';
+import { stageLabel, statusLabel, statusColor } from '@/lib/coralStage';
 import { PublicPhotos } from './PublicPhotos';
 import { siteUrl } from '@/lib/siteUrl';
 import type { LineageNode } from '@/app/actions/lineage';
@@ -240,6 +240,11 @@ export default async function PublicCoralPage({ params }: Props) {
             {unclaimed && (
               <Badge variant="filled" size="sm" radius="xl" color="ocean">
                 Unclaimed frag
+              </Badge>
+            )}
+            {statusLabel(specimen.status) && (
+              <Badge variant="filled" size="sm" radius="xl" color={statusColor(specimen.status)}>
+                {statusLabel(specimen.status)}
               </Badge>
             )}
             {specimen.category && <CategoryBadge category={specimen.category} />}
