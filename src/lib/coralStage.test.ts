@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { stageLabel, effectiveGeneration } from './coralStage';
+import { stageLabel, effectiveGeneration, statusLabel, statusColor } from './coralStage';
 
 describe('stageLabel', () => {
   it.each([
@@ -38,5 +38,39 @@ describe('effectiveGeneration', () => {
 
   it('is zero for a root coral with no prior generations', () => {
     expect(effectiveGeneration(0, null)).toBe(0);
+  });
+});
+
+describe('statusLabel', () => {
+  // A living coral is the normal case and carries no badge.
+  it('returns null for ALIVE', () => {
+    expect(statusLabel('ALIVE')).toBeNull();
+  });
+
+  it.each([
+    ['LOST', 'Lost'],
+    ['SOLD', 'Sold'],
+    ['GIVEN', 'Given away'],
+  ] as const)('labels %s', (status, label) => {
+    expect(statusLabel(status)).toBe(label);
+  });
+
+  it.each([null, undefined])('returns null for %s', (input) => {
+    expect(statusLabel(input)).toBeNull();
+  });
+});
+
+describe('statusColor', () => {
+  it.each([
+    ['LOST', 'gray'],
+    ['SOLD', 'grape'],
+    ['GIVEN', 'teal'],
+  ] as const)('colors %s', (status, color) => {
+    expect(statusColor(status)).toBe(color);
+  });
+
+  // The fallback is what a newly added status would silently hit.
+  it.each([['ALIVE' as const], [null], [undefined]])('falls back to gray for %s', (input) => {
+    expect(statusColor(input)).toBe('gray');
   });
 });
