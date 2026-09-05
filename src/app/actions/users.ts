@@ -3,6 +3,7 @@
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { pool } from '@/lib/db';
+import { imageProxyUrl } from '@/lib/s3';
 import { auth } from '@/lib/auth';
 import { invariant } from '@/lib/log';
 import { getCurrentUser } from '@/lib/getCurrentUser';
@@ -76,17 +77,20 @@ export async function getUserProfile(username: string): Promise<UserProfile | nu
 }
 
 export async function getUserSpecimens(userId: string): Promise<SpecimenRow[]> {
-  const { rows } = await pool.query<SpecimenRow>(
+  const { rows } = await pool.query<Omit<SpecimenRow, 'coverPhotoUrl'> & { coverKey: string | null }>(
     `SELECT
        c.id, c.name, c.species, c.category, c."rfCode", c.origin, c.notes,
        c."identityHue", c."acquiredDate", c."createdAt",
-       (SELECT '/api/image?key=' || p."s3Key" FROM public."CoralPhoto" p WHERE p."coralId" = c.id ORDER BY p."createdAt" ASC LIMIT 1) AS "coverPhotoUrl"
+       (SELECT p."s3Key" FROM public."CoralPhoto" p WHERE p."coralId" = c.id ORDER BY p."createdAt" ASC LIMIT 1) AS "coverKey"
      FROM public."Coral" c
      WHERE c."ownerId" = $1
      ORDER BY c."createdAt" DESC`,
     [userId]
   );
-  return rows;
+  return rows.map(({ coverKey, ...r }) => ({
+    ...r,
+    coverPhotoUrl: coverKey ? imageProxyUrl(coverKey) : null,
+  }));
 }
 
 export type BloodlineRow = {

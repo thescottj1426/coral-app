@@ -7,7 +7,6 @@ import {
 import { IconCopy, IconCheck, IconLink, IconCamera } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import Link from 'next/link';
-import { addSpecimenPhoto } from '@/app/actions/specimens';
 import { setFragRecipient } from '@/app/actions/lineage';
 import { PhotoLightbox } from '@/components/specimen/PhotoLightbox';
 
@@ -57,16 +56,16 @@ export function FragRow({ frag, index }: { frag: LoggedFrag; index: number }) {
     try {
       const fd = new FormData();
       fd.append('file', file);
+      fd.append('specimenId', frag.id);
       const res = await fetch('/api/upload', { method: 'POST', body: fd });
       if (!res.ok) {
         const { error } = await res.json().catch(() => ({ error: 'Upload failed' }));
         throw new Error(error ?? 'Upload failed');
       }
       const data = await res.json();
-      const added = await addSpecimenPhoto({ specimenId: frag.id, photoKey: data.key, photoUrl: data.url });
       // Append: a plug photographed over weeks is a growth history, and
       // replacing would throw away every earlier shot.
-      setPhotos((prev) => [...prev, added]);
+      setPhotos((prev) => [...prev, data.photo]);
       notifications.show({
         title: 'Photo added',
         message: `Attached to ${frag.rfCode}. It appears once approved.`,

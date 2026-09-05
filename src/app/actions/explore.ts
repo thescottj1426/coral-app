@@ -1,6 +1,7 @@
 'use server';
 
 import { pool } from '@/lib/db';
+import { imageProxyUrl } from '@/lib/s3';
 import type { SpecimenRow } from './specimens';
 
 export type ExploreSpecimen = SpecimenRow & {
@@ -15,14 +16,15 @@ export type ExploreCollector = {
   specimenCount: number;
 };
 
-const COVER_PHOTO_SQL = `(SELECT '/api/image?key=' || p."s3Key" FROM public."CoralPhoto" p WHERE p."coralId" = c.id AND p.status = 'approved' ORDER BY p."createdAt" ASC LIMIT 1)`;
+// Returns the key; imageProxyUrl builds the URL once, in TypeScript.
+const COVER_PHOTO_SQL = `(SELECT p."s3Key" FROM public."CoralPhoto" p WHERE p."coralId" = c.id AND p.status = 'approved' ORDER BY p."createdAt" ASC LIMIT 1)`;
 
 export async function getExploreSpecimens(): Promise<ExploreSpecimen[]> {
-  const { rows } = await pool.query<ExploreSpecimen>(
+  const { rows } = await pool.query<Omit<ExploreSpecimen, 'coverPhotoUrl'> & { coverKey: string | null }>(
     `SELECT
        c.id, c.name, c.species, c.category, c."rfCode", c.origin, c.notes,
        c."identityHue", c."acquiredDate", c."createdAt",
-       ${COVER_PHOTO_SQL} AS "coverPhotoUrl",
+       ${COVER_PHOTO_SQL} AS "coverKey",
        u.username AS "ownerUsername",
        u."displayName" AS "ownerDisplayName"
      FROM public."Coral" c
@@ -44,7 +46,10 @@ export async function getExploreSpecimens(): Promise<ExploreSpecimen[]> {
      ORDER BY c."createdAt" DESC
      LIMIT 60`
   );
-  return rows;
+  return rows.map(({ coverKey, ...r }) => ({
+    ...r,
+    coverPhotoUrl: coverKey ? imageProxyUrl(coverKey) : null,
+  }));
 }
 
 export async function getExploreCollectors(): Promise<ExploreCollector[]> {

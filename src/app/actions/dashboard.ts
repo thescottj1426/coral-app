@@ -1,6 +1,7 @@
 'use server';
 
 import { pool } from '@/lib/db';
+import { imageProxyUrl } from '@/lib/s3';
 
 export type DashboardStats = {
   coralCount: number;
@@ -42,9 +43,9 @@ export async function getDashboardStats(userId: string): Promise<DashboardStats>
 }
 
 export async function getRecentCorals(userId: string, limit = 4): Promise<DashboardCoral[]> {
-  const { rows } = await pool.query<DashboardCoral>(
+  const { rows } = await pool.query<Omit<DashboardCoral, 'coverUrl'> & { coverKey: string | null }>(
     `SELECT c.id, c.name, c."rfCode", c."identityHue", c.category, c."createdAt",
-       (SELECT '/api/image?key=' || p."s3Key" FROM public."CoralPhoto" p WHERE p."coralId" = c.id ORDER BY CASE WHEN p.status = 'approved' THEN 0 ELSE 1 END, p."createdAt" ASC LIMIT 1) AS "coverUrl",
+       (SELECT p."s3Key" FROM public."CoralPhoto" p WHERE p."coralId" = c.id ORDER BY CASE WHEN p.status = 'approved' THEN 0 ELSE 1 END, p."createdAt" ASC LIMIT 1) AS "coverKey",
        (SELECT p.status = 'pending' FROM public."CoralPhoto" p WHERE p."coralId" = c.id ORDER BY CASE WHEN p.status = 'approved' THEN 0 ELSE 1 END, p."createdAt" ASC LIMIT 1) AS "coverPending"
      FROM public."Coral" c
      WHERE c."ownerId" = $1
@@ -52,7 +53,10 @@ export async function getRecentCorals(userId: string, limit = 4): Promise<Dashbo
      LIMIT $2`,
     [userId, limit]
   );
-  return rows;
+  return rows.map(({ coverKey, ...r }) => ({
+    ...r,
+    coverUrl: coverKey ? imageProxyUrl(coverKey) : null,
+  }));
 }
 
 export type MyActivity = {

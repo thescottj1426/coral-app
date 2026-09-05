@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { auth } from '@/lib/auth';
 import { pool, queryOne } from '@/lib/db';
+import { imageProxyUrl } from '@/lib/s3';
 
 async function getCurrentAdmin() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -32,7 +33,7 @@ export async function getPendingPhotos(): Promise<PendingPhoto[]> {
   await getCurrentAdmin();
   const { rows } = await pool.query<PendingPhoto>(
     `SELECT
-       p.id, p."s3Key", '/api/image?key=' || p."s3Key" AS url, p."createdAt",
+       p.id, p."s3Key", p."createdAt",
        c.id AS "coralId", c.name AS "coralName", c."rfCode" AS "coralRfCode",
        u.username AS "ownerUsername", u."displayName" AS "ownerDisplayName"
      FROM public."CoralPhoto" p
@@ -41,7 +42,7 @@ export async function getPendingPhotos(): Promise<PendingPhoto[]> {
      WHERE p.status = 'pending'
      ORDER BY p."createdAt" ASC`
   );
-  return rows;
+  return rows.map((r) => ({ ...r, url: imageProxyUrl(r.s3Key) }));
 }
 
 export async function reviewPhoto(
@@ -94,7 +95,7 @@ export async function getPhotoHistory(limit = 100): Promise<ReviewedPhoto[]> {
   await getCurrentAdmin();
   const { rows } = await pool.query<ReviewedPhoto>(
     `SELECT
-       p.id, p."s3Key", '/api/image?key=' || p."s3Key" AS url, p."createdAt",
+       p.id, p."s3Key", p."createdAt",
        p.status, p."reviewedAt", p."reviewNote",
        c.id AS "coralId", c.name AS "coralName", c."rfCode" AS "coralRfCode",
        u.username AS "ownerUsername", u."displayName" AS "ownerDisplayName",
@@ -108,7 +109,7 @@ export async function getPhotoHistory(limit = 100): Promise<ReviewedPhoto[]> {
      LIMIT $1`,
     [limit]
   );
-  return rows;
+  return rows.map((r) => ({ ...r, url: imageProxyUrl(r.s3Key) }));
 }
 
 export type OpenReport = {

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { pool } from '@/lib/db';
+import { imageProxyUrl } from '@/lib/s3';
 import { getCurrentUser } from '@/lib/getCurrentUser';
 import { uniqueRFCode } from '@/lib/rfCode';
 import { createNotification } from '@/app/actions/notifications';
@@ -20,6 +21,10 @@ export type LineageNode = {
   parentStageAtCut: CoralStage | null;
   /** Every photo, oldest first, approved or not. Only getChildren populates it. */
   photos?: Array<{ id: string; url: string; status: string }>;
+};
+
+type ChildRow = Omit<LineageNode, 'photos'> & {
+  photos: Array<{ id: string; s3Key: string; status: string }>;
 };
 
 export async function getLineage(specimenId: string): Promise<LineageNode[]> {
@@ -46,7 +51,7 @@ export async function getLineage(specimenId: string): Promise<LineageNode[]> {
 }
 
 export async function getChildren(specimenId: string): Promise<LineageNode[]> {
-  const { rows } = await pool.query<LineageNode>(
+  const { rows } = await pool.query<ChildRow>(
     `SELECT c.id, c.name, c."rfCode", c."identityHue", u.username AS "ownerUsername", 1 AS depth,
             c."generationFromMother", l."parentStageAtCut",
             -- The frag's own page shows approved photos only, so without this
@@ -57,7 +62,7 @@ export async function getChildren(specimenId: string): Promise<LineageNode[]> {
               SELECT json_agg(
                        json_build_object(
                          'id', p.id,
-                         'url', '/api/image?key=' || p."s3Key",
+                         's3Key', p."s3Key",
                          'status', p.status
                        ) ORDER BY p."createdAt" ASC
                      )
@@ -71,7 +76,10 @@ export async function getChildren(specimenId: string): Promise<LineageNode[]> {
      ORDER BY c."createdAt" ASC`,
     [specimenId]
   );
-  return rows;
+  return rows.map((r) => ({
+    ...r,
+    photos: r.photos.map((p) => ({ id: p.id, url: imageProxyUrl(p.s3Key), status: p.status })),
+  }));
 }
 
 // fragKind = 'unclaimed_frag': this coral exists in DB with ownerId=NULL, ready to be claimed
