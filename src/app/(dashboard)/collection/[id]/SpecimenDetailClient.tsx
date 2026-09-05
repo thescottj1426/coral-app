@@ -66,6 +66,7 @@ export function MetaStripActions({ specimen, isOwner }: Props) {
         parentId={specimen.id}
         parentRfCode={specimen.rfCode ?? specimen.id}
         parentName={specimen.name}
+        parentStage={specimen.stage ?? null}
         parentGeneration={0}
       />
       <ListFragModal

@@ -153,11 +153,13 @@ export async function createSpecimen(data: {
   return specimen;
 }
 
+export type AddedPhoto = { id: string; url: string; status: string };
+
 export async function addSpecimenPhoto(data: {
   specimenId: string;
   photoKey: string;
   photoUrl: string;
-}): Promise<void> {
+}): Promise<AddedPhoto> {
   const user = await getCurrentUser();
 
   // You may photograph a coral you own, and also an UNCLAIMED frag cut from a
@@ -178,13 +180,19 @@ export async function addSpecimenPhoto(data: {
   const ownsUnclaimedChild = row?.ownerId === null && row?.parentOwnerId === user.id;
   if (!row || (!ownsIt && !ownsUnclaimedChild)) throw new Error('Not authorized');
 
-  await pool.query(
+  // Returns the row so the caller can append it without a refetch. The url is
+  // rebuilt from the key rather than trusting data.photoUrl — every read path
+  // derives it this way, and a caller passing a raw bucket URL is exactly the
+  // bug that made frag thumbnails render blank.
+  const { rows: created } = await pool.query<AddedPhoto>(
     `INSERT INTO public."CoralPhoto" (id, "s3Key", url, "coralId", status, "createdAt")
-     VALUES (gen_random_uuid()::text, $1, $2, $3, 'pending', NOW())`,
+     VALUES (gen_random_uuid()::text, $1, $2, $3, 'pending', NOW())
+     RETURNING id, '/api/image?key=' || "s3Key" AS url, status`,
     [data.photoKey, data.photoUrl, data.specimenId]
   );
 
   revalidatePath(`/collection/${data.specimenId}`);
+  return created[0];
 }
 
 // ownerId/ownerUsername are null for unclaimed frags — rows created by

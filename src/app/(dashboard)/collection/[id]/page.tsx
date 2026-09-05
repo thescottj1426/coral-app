@@ -89,7 +89,7 @@ export default async function SpecimenDetailPage({ params }: Props) {
 
   const unclaimedFrags = frags
     .filter(f => !f.ownerUsername && f.rfCode)
-    .map(f => ({ id: f.id, rfCode: f.rfCode as string, kept: false, photoUrl: f.photoUrl ?? null }));
+    .map(f => ({ id: f.id, rfCode: f.rfCode as string, kept: false, photos: f.photos ?? [] }));
 
   return (
     <div>
