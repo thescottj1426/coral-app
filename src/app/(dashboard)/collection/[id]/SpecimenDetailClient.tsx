@@ -24,7 +24,7 @@ import { FragModal } from '@/components/specimen/FragModal';
 import { EditSpecimenModal } from '@/components/specimen/EditSpecimenModal';
 import { ListFragModal } from '@/components/specimen/ListFragModal';
 import { PhotoLightbox } from '@/components/specimen/PhotoLightbox';
-import { restoreSpecimen, addSpecimenPhoto } from '@/app/actions/specimens';
+import { restoreSpecimen } from '@/app/actions/specimens';
 import { RemoveSpecimenModal } from '@/components/specimen/RemoveSpecimenModal';
 import type { SpecimenDetail } from '@/app/actions/specimens';
 
@@ -179,10 +179,9 @@ export function AddPhotoButton({ specimenId }: { specimenId: string }) {
     try {
       const fd = new FormData();
       fd.append('file', file);
+      fd.append('specimenId', specimenId);
       const res = await fetch('/api/upload', { method: 'POST', body: fd });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Upload failed');
-      const { key, url } = await res.json();
-      await addSpecimenPhoto({ specimenId, photoKey: key, photoUrl: url });
       notifications.show({ message: 'Photo added — pending review', color: 'teal' });
       router.refresh();
     } catch (err) {

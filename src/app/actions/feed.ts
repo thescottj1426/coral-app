@@ -2,6 +2,7 @@
 
 import { headers } from 'next/headers';
 import { pool } from '@/lib/db';
+import { imageProxyUrl } from '@/lib/s3';
 import { auth } from '@/lib/auth';
 
 export type FeedEventKind = 'specimen' | 'lineage' | 'listing';
@@ -67,7 +68,7 @@ export async function getFeedItems(limit = 30): Promise<FeedItem[]> {
   const currentUserId = session?.user?.id ?? null;
 
   // deterministic hue from string
-  const { rows } = await pool.query<FeedItem>(
+  const { rows } = await pool.query<Omit<FeedItem, 'specimenCoverUrl'> & { specimenCoverKey: string | null }>(
     `WITH actor_hue AS (
        SELECT id, ABS(HASHTEXT(id)) % 360 AS hue FROM public."User"
      ),
@@ -87,10 +88,10 @@ export async function getFeedItems(limit = 30): Promise<FeedItem[]> {
          c.species AS "specimenSpecies",
          c."identityHue" AS "specimenIdentityHue",
          c.notes AS "specimenNotes",
-         (SELECT '/api/image?key=' || p."s3Key"
+         (SELECT p."s3Key"
           FROM public."CoralPhoto" p
           WHERE p."coralId" = c.id AND p.status = 'approved'
-          ORDER BY p."createdAt" ASC LIMIT 1) AS "specimenCoverUrl",
+          ORDER BY p."createdAt" ASC LIMIT 1) AS "specimenCoverKey",
          NULL::text AS "parentId",
          NULL::text AS "parentName",
          NULL::text AS "parentRfCode",
@@ -119,10 +120,10 @@ export async function getFeedItems(limit = 30): Promise<FeedItem[]> {
          child.species AS "specimenSpecies",
          child."identityHue" AS "specimenIdentityHue",
          child.notes AS "specimenNotes",
-         (SELECT '/api/image?key=' || p."s3Key"
+         (SELECT p."s3Key"
           FROM public."CoralPhoto" p
           WHERE p."coralId" = child.id
-          ORDER BY p."createdAt" ASC LIMIT 1) AS "specimenCoverUrl",
+          ORDER BY p."createdAt" ASC LIMIT 1) AS "specimenCoverKey",
          parent.id AS "parentId",
          parent.name AS "parentName",
          parent."rfCode" AS "parentRfCode",
@@ -153,10 +154,10 @@ export async function getFeedItems(limit = 30): Promise<FeedItem[]> {
          c.species AS "specimenSpecies",
          c."identityHue" AS "specimenIdentityHue",
          c.notes AS "specimenNotes",
-         (SELECT '/api/image?key=' || p."s3Key"
+         (SELECT p."s3Key"
           FROM public."CoralPhoto" p
           WHERE p."coralId" = c.id
-          ORDER BY p."createdAt" ASC LIMIT 1) AS "specimenCoverUrl",
+          ORDER BY p."createdAt" ASC LIMIT 1) AS "specimenCoverKey",
          NULL::text AS "parentId",
          NULL::text AS "parentName",
          NULL::text AS "parentRfCode",
@@ -177,5 +178,8 @@ export async function getFeedItems(limit = 30): Promise<FeedItem[]> {
      LIMIT $1`,
     [limit]
   );
-  return rows;
+  return rows.map(({ specimenCoverKey, ...r }) => ({
+    ...r,
+    specimenCoverUrl: specimenCoverKey ? imageProxyUrl(specimenCoverKey) : null,
+  }));
 }

@@ -11,15 +11,15 @@ export const s3 = new S3Client({
 export const S3_BUCKET = process.env.AWS_S3_BUCKET!;
 
 /**
- * The bucket is private — a direct object URL answers 403, so it can never be
- * rendered. Every read path already rebuilds this shape in SQL
- * (`'/api/image?key=' || p."s3Key"`); this is the same URL for callers holding
- * a key in JS.
+ * The one place a photo URL is built. The bucket is private — a direct object
+ * URL answers 403 — so images are served through /api/image, which signs the
+ * read.
  *
- * The predecessor was named s3PublicUrl and returned the direct S3 URL. It
- * asserted a public bucket that does not exist, and the one component that
- * rendered its output — FragRow — showed a blank image for every frag photo
- * ever taken.
+ * This used to be constructed in fourteen separate SQL fragments plus a
+ * misnamed `s3PublicUrl` that returned the direct bucket URL. With no single
+ * answer to "what is this photo's URL", /api/upload quietly returned the wrong
+ * one and every frag photo rendered blank. Queries now select `s3Key` and hand
+ * it here.
  */
 export function imageProxyUrl(key: string): string {
   return `/api/image?key=${encodeURIComponent(key)}`;

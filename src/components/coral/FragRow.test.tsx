@@ -4,14 +4,12 @@ import userEvent from '@testing-library/user-event';
 import { renderWithMantine } from '@/test/renderWithMantine';
 import { FragRow } from './FragRow';
 
-const { setFragRecipient, addSpecimenPhoto, show } = vi.hoisted(() => ({
+const { setFragRecipient, show } = vi.hoisted(() => ({
   setFragRecipient: vi.fn<(id: string, recipient: string) => Promise<{ error?: string }>>(),
-  addSpecimenPhoto: vi.fn(),
   show: vi.fn(),
 }));
 
 vi.mock('@/app/actions/lineage', () => ({ setFragRecipient }));
-vi.mock('@/app/actions/specimens', () => ({ addSpecimenPhoto }));
 vi.mock('@mantine/notifications', () => ({ notifications: { show } }));
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => (
@@ -107,14 +105,18 @@ describe('FragRow', () => {
   });
 
   describe('photos', () => {
+    let fetchMock: ReturnType<typeof vi.fn>;
+
     function stubUpload(key: string) {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      fetchMock = vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({ url: `/api/image?key=${key}`, key }),
-      }));
-      addSpecimenPhoto.mockResolvedValueOnce({
-        id: key, url: `/api/image?key=${key}`, status: 'pending',
+        json: async () => ({
+          url: `/api/image?key=${key}`,
+          key,
+          photo: { id: key, url: `/api/image?key=${key}`, status: 'pending' },
+        }),
       });
+      vi.stubGlobal('fetch', fetchMock);
     }
 
     async function upload(container: HTMLElement) {
@@ -180,14 +182,17 @@ describe('FragRow', () => {
       vi.unstubAllGlobals();
     });
 
-    it('attaches the photo to the frag it was taken for', async () => {
+    // One request, not two: the row is written alongside the upload, so a
+    // failure cannot leave an object in S3 with nothing pointing at it.
+    it('attaches the photo to the frag it was taken for, in one request', async () => {
       stubUpload('k9');
       const { container } = renderWithMantine(<FragRow frag={unclaimed} index={0} />);
       await upload(container);
 
-      expect(addSpecimenPhoto).toHaveBeenCalledWith(
-        expect.objectContaining({ specimenId: 'c1', photoKey: 'k9' })
-      );
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const body = fetchMock.mock.calls[0][1].body as FormData;
+      expect(body.get('specimenId')).toBe('c1');
+      expect(body.get('file')).toBeInstanceOf(File);
       vi.unstubAllGlobals();
     });
   });

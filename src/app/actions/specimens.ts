@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { pool } from '@/lib/db';
+import { imageProxyUrl } from '@/lib/s3';
 import { getCurrentUser } from '@/lib/getCurrentUser';
 import { sendEmail } from '@/lib/email';
 import { welcomeTemplate } from '@/lib/emailTemplates';
@@ -42,21 +43,24 @@ export type SpecimenRow = {
 
 export async function getMySpecimens(userId?: string): Promise<SpecimenRow[]> {
   const user = userId ? { id: userId } : await getCurrentUser();
-  const { rows } = await pool.query<SpecimenRow>(
+  const { rows } = await pool.query<Omit<SpecimenRow, 'coverPhotoUrl'> & { coverKey: string | null }>(
     `SELECT
        c.id, c.name, c.species, c.category, c."rfCode", c.origin, c.notes,
        c."identityHue", c."acquiredDate", c."createdAt", c."updatedAt",
        c."tankName", c."lightPar", c."flowLevel",
        c."stage", c."acquiredStage", c."generationFromMother", c."sourceColony", c."vendor",
        c.status, c."statusAt", c."statusNote", c."givenTo",
-       (SELECT '/api/image?key=' || p."s3Key" FROM public."CoralPhoto" p WHERE p."coralId" = c.id ORDER BY CASE WHEN p.status = 'approved' THEN 0 ELSE 1 END, p."createdAt" ASC LIMIT 1) AS "coverPhotoUrl",
+       (SELECT p."s3Key" FROM public."CoralPhoto" p WHERE p."coralId" = c.id ORDER BY CASE WHEN p.status = 'approved' THEN 0 ELSE 1 END, p."createdAt" ASC LIMIT 1) AS "coverKey",
        (SELECT p.status = 'pending' FROM public."CoralPhoto" p WHERE p."coralId" = c.id ORDER BY CASE WHEN p.status = 'approved' THEN 0 ELSE 1 END, p."createdAt" ASC LIMIT 1) AS "coverPhotoPending"
      FROM public."Coral" c
      WHERE c."ownerId" = $1
      ORDER BY c."createdAt" DESC`,
     [user.id]
   );
-  return rows;
+  return rows.map(({ coverKey, ...r }) => ({
+    ...r,
+    coverPhotoUrl: coverKey ? imageProxyUrl(coverKey) : null,
+  }));
 }
 
 export async function createSpecimen(data: {
@@ -153,6 +157,16 @@ export async function createSpecimen(data: {
   return specimen;
 }
 
+type PhotoRow = { id: string; s3Key: string; status: string; createdAt: string };
+
+/** The query returns keys; the URL is built here, in the one place that knows how. */
+function withPhotoUrls<T extends { photos: PhotoRow[] }>(row: T) {
+  return {
+    ...row,
+    photos: row.photos.map((p) => ({ ...p, url: imageProxyUrl(p.s3Key) })),
+  };
+}
+
 export type AddedPhoto = { id: string; url: string; status: string };
 
 export async function addSpecimenPhoto(data: {
@@ -184,15 +198,16 @@ export async function addSpecimenPhoto(data: {
   // rebuilt from the key rather than trusting data.photoUrl — every read path
   // derives it this way, and a caller passing a raw bucket URL is exactly the
   // bug that made frag thumbnails render blank.
-  const { rows: created } = await pool.query<AddedPhoto>(
+  const { rows: created } = await pool.query<{ id: string; s3Key: string; status: string }>(
     `INSERT INTO public."CoralPhoto" (id, "s3Key", url, "coralId", status, "createdAt")
      VALUES (gen_random_uuid()::text, $1, $2, $3, 'pending', NOW())
-     RETURNING id, '/api/image?key=' || "s3Key" AS url, status`,
+     RETURNING id, "s3Key", status`,
     [data.photoKey, data.photoUrl, data.specimenId]
   );
 
   revalidatePath(`/collection/${data.specimenId}`);
-  return created[0];
+  const photo = created[0];
+  return { id: photo.id, url: imageProxyUrl(photo.s3Key), status: photo.status };
 }
 
 // ownerId/ownerUsername are null for unclaimed frags — rows created by
@@ -224,7 +239,7 @@ export async function getPublicSpecimen(rfCodeOrId: string): Promise<SpecimenDet
        0 AS "fragsGiven", 0 AS "generationsBack", 0 AS "photoCount",
        COALESCE(
          json_agg(
-           json_build_object('id', p.id, 'url', '/api/image?key=' || p."s3Key", 's3Key', p."s3Key", 'status', p.status, 'createdAt', p."createdAt")
+           json_build_object('id', p.id, 's3Key', p."s3Key", 'status', p.status, 'createdAt', p."createdAt")
            ORDER BY p."createdAt" ASC
          ) FILTER (WHERE p.id IS NOT NULL AND p.status = 'approved'),
          '[]'
@@ -237,6 +252,8 @@ export async function getPublicSpecimen(rfCodeOrId: string): Promise<SpecimenDet
      LIMIT 1`,
     [rfCodeOrId]
   );
+
+  if (rows[0]) return withPhotoUrls(rows[0]);
 
   if (!rows[0]) {
     // This returning null 404s the public page. If the code exists in Coral,
@@ -280,7 +297,7 @@ export async function getSpecimen(rfCodeOrId: string): Promise<SpecimenDetail | 
        (SELECT COUNT(*)::int FROM public."CoralPhoto" WHERE "coralId" = c.id) AS "photoCount",
        COALESCE(
          json_agg(
-           json_build_object('id', p.id, 'url', '/api/image?key=' || p."s3Key", 's3Key', p."s3Key", 'status', p.status, 'createdAt', p."createdAt")
+           json_build_object('id', p.id, 's3Key', p."s3Key", 'status', p.status, 'createdAt', p."createdAt")
            ORDER BY p."createdAt" ASC
          ) FILTER (WHERE p.id IS NOT NULL AND (p.status = 'approved' OR c."ownerId" = $2)),
          '[]'
@@ -293,7 +310,7 @@ export async function getSpecimen(rfCodeOrId: string): Promise<SpecimenDetail | 
      LIMIT 1`,
     [rfCodeOrId, viewerId]
   );
-  return rows[0] ?? null;
+  return rows[0] ? withPhotoUrls(rows[0]) : null;
 }
 
 export async function updateSpecimen(id: string, data: {
@@ -343,18 +360,21 @@ export type PublicSpecimenStub = {
 };
 
 export async function getMoreByOwner(ownerId: string, excludeId: string, limit = 4): Promise<PublicSpecimenStub[]> {
-  const { rows } = await pool.query<PublicSpecimenStub>(
+  const { rows } = await pool.query<Omit<PublicSpecimenStub, 'coverPhotoUrl'> & { coverKey: string | null }>(
     `SELECT c.id, c.name, c."rfCode", c."identityHue", c.category,
-       (SELECT '/api/image?key=' || p."s3Key" FROM public."CoralPhoto" p
+       (SELECT p."s3Key" FROM public."CoralPhoto" p
         WHERE p."coralId" = c.id AND p.status = 'approved'
-        ORDER BY p."createdAt" ASC LIMIT 1) AS "coverPhotoUrl"
+        ORDER BY p."createdAt" ASC LIMIT 1) AS "coverKey"
      FROM public."Coral" c
      WHERE c."ownerId" = $1 AND c.id != $2
      ORDER BY c."createdAt" DESC
      LIMIT $3`,
     [ownerId, excludeId, limit]
   );
-  return rows;
+  return rows.map(({ coverKey, ...r }) => ({
+    ...r,
+    coverPhotoUrl: coverKey ? imageProxyUrl(coverKey) : null,
+  }));
 }
 
 export async function searchCoralNames(query: string): Promise<string[]> {
