@@ -319,7 +319,9 @@ describe('photographing an unclaimed frag', () => {
     const children = await getChildren(parent.id);
     expect(children).toHaveLength(1);
     expect(children[0].id).toBe(frag.id);
-    expect(children[0].photoUrl).toBe('/api/image?key=k3');
+    expect(children[0].photos).toEqual([
+      expect.objectContaining({ url: '/api/image?key=k3', status: 'pending' }),
+    ]);
   });
 
   it('keeps the pending photo off the public page', async () => {
@@ -334,7 +336,7 @@ describe('photographing an unclaimed frag', () => {
     const { parent, frag } = await parentWithUnclaimedFrag();
     await addSpecimenPhoto({ specimenId: frag.id, photoKey: 'k5', photoUrl: '/api/image?key=k5' });
 
-    const url = (await getChildren(parent.id))[0].photoUrl ?? '';
+    const url = (await getChildren(parent.id))[0].photos?.[0]?.url ?? '';
     expect(url).toContain('/api/image?key=');
     expect(url).not.toContain('amazonaws.com');
     expect(frag.id).toBeTruthy();

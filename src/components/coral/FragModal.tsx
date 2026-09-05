@@ -38,18 +38,27 @@ export interface FragModalProps {
   parentId: string;
   parentRfCode: string;
   parentName: string;
+  /** Null on corals logged before the stage field existed — asked for below. */
+  parentStage: CoralStage | null;
   parentGeneration: number;
 }
 
-export function FragModal({ opened, onClose, parentId, parentRfCode, parentName, parentGeneration }: FragModalProps) {
+export function FragModal({ opened, onClose, parentId, parentRfCode, parentName, parentStage, parentGeneration }: FragModalProps) {
   const newGeneration = parentGeneration + 1;
   const [frags, setFrags] = useState<LoggedFrag[]>([]);
   const [stage, setStage] = useState<CoralStage>('FRAG');
+  // Only asked when unknown, and answering it updates the coral for good.
+  const [sourceStage, setSourceStage] = useState<CoralStage>('COLONY');
   const [isPending, startTransition] = useTransition();
+  const needsSourceStage = parentStage === null;
 
   function addFrag(keepForSelf: boolean) {
     startTransition(async () => {
-      const created = await createFrags(parentId, 1, { stage, keepForSelf });
+      const created = await createFrags(parentId, 1, {
+        stage,
+        keepForSelf,
+        ...(needsSourceStage ? { parentStage: sourceStage } : {}),
+      });
       if ('error' in created) {
         notifications.show({ title: 'Could not log frag', message: created.error, color: 'red' });
         return;
@@ -138,6 +147,18 @@ export function FragModal({ opened, onClose, parentId, parentRfCode, parentName,
             </ScrollArea.Autosize>
           )}
         </Stack>
+
+        {needsSourceStage && (
+          <Select
+            label={`What are you cutting from?`}
+            description="This coral was logged before sizes were tracked. Answer once and the lineage records it from here on."
+            data={CORAL_STAGES.map(o => ({ value: o.value, label: o.label }))}
+            value={sourceStage}
+            onChange={(v) => v && setSourceStage(v as CoralStage)}
+            allowDeselect={false}
+            size="sm"
+          />
+        )}
 
         <Select
           label="Frag size"

@@ -27,6 +27,20 @@ export async function getExploreSpecimens(): Promise<ExploreSpecimen[]> {
        u."displayName" AS "ownerDisplayName"
      FROM public."Coral" c
      JOIN public."User" u ON u.id = c."ownerId"
+     -- A frag you cut and kept is the same genotype in a smaller piece, and it
+     -- carries the parent's name, so listing both shows the same coral twice —
+     -- the frag's card being the emptier of the two. Hidden here only; it stays
+     -- in /collection, on the parent's page, and on its own /coral page.
+     --
+     -- Scoped to same-owner deliberately: a frag CLAIMED from another keeper is
+     -- a real acquisition into a new collection and belongs in Explore.
+     WHERE NOT EXISTS (
+       SELECT 1
+         FROM public."Lineage" l
+         JOIN public."Coral" par ON par.id = l."parentId"
+        WHERE l."childId" = c.id
+          AND par."ownerId" = c."ownerId"
+     )
      ORDER BY c."createdAt" DESC
      LIMIT 60`
   );

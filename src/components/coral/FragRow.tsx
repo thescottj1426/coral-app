@@ -9,10 +9,22 @@ import { notifications } from '@mantine/notifications';
 import Link from 'next/link';
 import { addSpecimenPhoto } from '@/app/actions/specimens';
 import { setFragRecipient } from '@/app/actions/lineage';
+import { PhotoLightbox } from '@/components/specimen/PhotoLightbox';
 
 const MONO = 'var(--font-ibm-plex-mono), monospace';
 
-export type LoggedFrag = { id: string; rfCode: string; kept: boolean; photoUrl?: string | null };
+export type FragPhoto = { id: string; url: string; status: string };
+
+export type LoggedFrag = {
+  id: string;
+  rfCode: string;
+  kept: boolean;
+  photos?: FragPhoto[];
+};
+
+// Past this the row stops being a row. The rest stay reachable through the
+// lightbox via the +N chip.
+const VISIBLE_THUMBS = 3;
 
 /**
  * One logged frag. Two dispositions, decided per plug:
@@ -23,9 +35,10 @@ export type LoggedFrag = { id: string; rfCode: string; kept: boolean; photoUrl?:
  * unclaimed and the caller owning its parent; the permission lapses on claim.
  */
 export function FragRow({ frag, index }: { frag: LoggedFrag; index: number }) {
-  const [photoUrl, setPhotoUrl] = useState<string | null>(frag.photoUrl ?? null);
+  const [photos, setPhotos] = useState<FragPhoto[]>(frag.photos ?? []);
   const [uploading, setUploading] = useState(false);
   const [recipient, setRecipient] = useState('');
+  const [lightboxAt, setLightboxAt] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const claimUrl =
@@ -50,8 +63,10 @@ export function FragRow({ frag, index }: { frag: LoggedFrag; index: number }) {
         throw new Error(error ?? 'Upload failed');
       }
       const data = await res.json();
-      await addSpecimenPhoto({ specimenId: frag.id, photoKey: data.key, photoUrl: data.url });
-      setPhotoUrl(data.url);
+      const added = await addSpecimenPhoto({ specimenId: frag.id, photoKey: data.key, photoUrl: data.url });
+      // Append: a plug photographed over weeks is a growth history, and
+      // replacing would throw away every earlier shot.
+      setPhotos((prev) => [...prev, added]);
       notifications.show({
         title: 'Photo added',
         message: `Attached to ${frag.rfCode}. It appears once approved.`,
@@ -96,15 +111,33 @@ export function FragRow({ frag, index }: { frag: LoggedFrag; index: number }) {
             style={{ display: 'none' }}
             onChange={handleFile}
           />
-          {photoUrl ? (
-            <Image
-              src={photoUrl}
-              alt={`Frag ${frag.rfCode}`}
-              w={36} h={36} radius={6} fit="cover"
-              style={{ cursor: 'pointer' }}
-              onClick={() => fileRef.current?.click()}
-            />
-          ) : (
+          <Group gap={4} wrap="nowrap">
+            {photos.slice(0, VISIBLE_THUMBS).map((photo, i) => (
+              <Image
+                key={photo.id}
+                src={photo.url}
+                alt={`Frag ${frag.rfCode} photo ${i + 1}`}
+                w={36} h={36} radius={6} fit="cover"
+                style={{ cursor: 'pointer' }}
+                onClick={() => setLightboxAt(i)}
+              />
+            ))}
+
+            {photos.length > VISIBLE_THUMBS && (
+              <ActionIcon
+                variant="light"
+                color="gray"
+                size={36}
+                radius={6}
+                onClick={() => setLightboxAt(VISIBLE_THUMBS)}
+                aria-label={`View all ${photos.length} photos of frag ${frag.rfCode}`}
+              >
+                <Text style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700 }}>
+                  +{photos.length - VISIBLE_THUMBS}
+                </Text>
+              </ActionIcon>
+            )}
+
             <ActionIcon
               variant="light"
               color={frag.kept ? 'teal' : 'ocean'}
@@ -117,7 +150,7 @@ export function FragRow({ frag, index }: { frag: LoggedFrag; index: number }) {
             >
               {uploading ? <Loader size={14} /> : <IconCamera size={16} />}
             </ActionIcon>
-          )}
+          </Group>
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -170,6 +203,19 @@ export function FragRow({ frag, index }: { frag: LoggedFrag; index: number }) {
           </CopyButton>
         )}
       </Group>
+
+      {lightboxAt !== null && (
+        <PhotoLightbox
+          photos={photos}
+          initialIndex={lightboxAt}
+          currentIndex={lightboxAt}
+          onNavigate={setLightboxAt}
+          opened
+          onClose={() => setLightboxAt(null)}
+          specimenName={`Frag ${frag.rfCode}`}
+          isOwner
+        />
+      )}
     </Paper>
   );
 }

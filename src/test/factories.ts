@@ -57,7 +57,10 @@ export async function seedCoral(
       over.category ?? null,
       over.rfCode ?? nextRfCode(),
       over.ownerId ?? null,
-      over.stage ?? 'COLONY',
+      // `??` would turn an explicit null back into COLONY, and a null stage is
+      // exactly what corals logged before the field look like — the case the
+      // cut path has to handle.
+      over.stage === undefined ? 'COLONY' : over.stage,
       over.status ?? 'ALIVE',
       over.givenTo ?? null,
     ]

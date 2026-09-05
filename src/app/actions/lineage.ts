@@ -18,8 +18,8 @@ export type LineageNode = {
   depth: number;
   generationFromMother: number | null;
   parentStageAtCut: CoralStage | null;
-  /** Latest photo, approved or not — only getChildren populates it. */
-  photoUrl?: string | null;
+  /** Every photo, oldest first, approved or not. Only getChildren populates it. */
+  photos?: Array<{ id: string; url: string; status: string }>;
 };
 
 export async function getLineage(specimenId: string): Promise<LineageNode[]> {
@@ -49,13 +49,21 @@ export async function getChildren(specimenId: string): Promise<LineageNode[]> {
   const { rows } = await pool.query<LineageNode>(
     `SELECT c.id, c.name, c."rfCode", c."identityHue", u.username AS "ownerUsername", 1 AS depth,
             c."generationFromMother", l."parentStageAtCut",
-            -- The frag's own page only shows approved photos, so without this
+            -- The frag's own page shows approved photos only, so without this
             -- the keeper who photographed a plug has nowhere to see it.
-            (SELECT '/api/image?key=' || p."s3Key"
-               FROM public."CoralPhoto" p
-              WHERE p."coralId" = c.id
-              ORDER BY p."createdAt" DESC
-              LIMIT 1) AS "photoUrl"
+            -- COALESCE, not the bare agg: an empty result must be [] so the
+            -- client can map over it without a null check.
+            COALESCE((
+              SELECT json_agg(
+                       json_build_object(
+                         'id', p.id,
+                         'url', '/api/image?key=' || p."s3Key",
+                         'status', p.status
+                       ) ORDER BY p."createdAt" ASC
+                     )
+                FROM public."CoralPhoto" p
+               WHERE p."coralId" = c.id
+            ), '[]') AS photos
      FROM public."Lineage" l
      JOIN public."Coral" c ON c.id = l."childId"
      LEFT JOIN public."User" u ON u.id = c."ownerId"
@@ -195,7 +203,7 @@ export async function claimFrag(rfCode: string): Promise<{ coralId: string; cora
 export async function createFrags(
   parentId: string,
   count: number,
-  opts?: { stage?: CoralStage; keepForSelf?: boolean }
+  opts?: { stage?: CoralStage; keepForSelf?: boolean; parentStage?: CoralStage }
 ): Promise<Array<{ id: string; rfCode: string }> | { error: string }> {
   const user = await getCurrentUser();
 
@@ -221,6 +229,26 @@ export async function createFrags(
   }
   if (found.ownerId !== user.id) {
     return { error: 'You can only cut frags from corals in your own collection.' };
+  }
+
+  // What the cut came from is the one fact a lineage tree cannot reconstruct
+  // later, and every link in production recorded NULL because corals predating
+  // the stage field still have none. Resolve it here — persisting the answer so
+  // the coral is only ever asked about once — rather than writing another NULL.
+  let parentStage = found.stage;
+  if (parentStage === null) {
+    if (!opts?.parentStage) {
+      return {
+        error:
+          `Set the stage of ${found.rfCode ?? 'this coral'} first — a cut has to record ` +
+          'whether it came from a mother colony, a colony, a mini colony or a frag.',
+      };
+    }
+    parentStage = opts.parentStage;
+    await pool.query('UPDATE public."Coral" SET stage = $1::"CoralStage" WHERE id = $2', [
+      parentStage,
+      parentId,
+    ]);
   }
 
   const parent = found;
@@ -254,7 +282,7 @@ export async function createFrags(
     await pool.query(
       `INSERT INTO public."Lineage" ("parentId", "childId", "parentStageAtCut")
        VALUES ($1, $2, $3::"CoralStage") ON CONFLICT DO NOTHING`,
-      [parentId, rows[0].id, parent.stage]
+      [parentId, rows[0].id, parentStage]
     );
 
     created.push({ id: rows[0].id, rfCode });

@@ -36,6 +36,66 @@ const childrenOf = async (parentId: string) => {
   return rows;
 };
 
+describe('recording what a cut came from', () => {
+  // Every lineage link in production stored NULL here, because the corals
+  // being cut predate the stage field. A tree that cannot say whether a frag
+  // came off a mother colony or another frag is not a lineage.
+  const stageOfLink = async (parentId: string) => {
+    const { rows } = await testPool.query<{ parentStageAtCut: string | null }>(
+      'SELECT "parentStageAtCut" FROM public."Lineage" WHERE "parentId" = $1 LIMIT 1',
+      [parentId]
+    );
+    return rows[0]?.parentStageAtCut ?? null;
+  };
+
+  it.each(['MOTHER_COLONY', 'COLONY', 'MINI_COLONY', 'FRAG'] as const)(
+    'records a cut from a %s',
+    async (stage) => {
+      const parent = await seedCoral({ ownerId: owner.id, stage });
+      await createFrags(parent.id, 1);
+      expect(await stageOfLink(parent.id)).toBe(stage);
+    }
+  );
+
+  it('refuses to cut from a coral whose stage is unknown', async () => {
+    const parent = await seedCoral({ ownerId: owner.id, stage: null });
+    const res = await createFrags(parent.id, 1);
+
+    expect(res).toEqual({ error: expect.stringMatching(/mother colony/i) });
+    expect(await childrenOf(parent.id)).toHaveLength(0);
+  });
+
+  it('accepts the stage when told, and records it on the link', async () => {
+    const parent = await seedCoral({ ownerId: owner.id, stage: null });
+    await createFrags(parent.id, 1, { parentStage: 'MINI_COLONY' });
+
+    expect(await stageOfLink(parent.id)).toBe('MINI_COLONY');
+  });
+
+  // Answering once must fix the coral, or the question returns on every cut.
+  it('persists the answer on the parent', async () => {
+    const parent = await seedCoral({ ownerId: owner.id, stage: null });
+    await createFrags(parent.id, 1, { parentStage: 'MOTHER_COLONY' });
+
+    const { rows } = await testPool.query<{ stage: string | null }>(
+      'SELECT stage FROM public."Coral" WHERE id = $1',
+      [parent.id]
+    );
+    expect(rows[0].stage).toBe('MOTHER_COLONY');
+
+    // Second cut needs no prompting.
+    const second = await createFrags(parent.id, 1);
+    expect(Array.isArray(second)).toBe(true);
+  });
+
+  it('prefers the stage already on the coral over a supplied one', async () => {
+    const parent = await seedCoral({ ownerId: owner.id, stage: 'COLONY' });
+    await createFrags(parent.id, 1, { parentStage: 'FRAG' });
+
+    expect(await stageOfLink(parent.id)).toBe('COLONY');
+  });
+});
+
 describe('createFrags', () => {
   it('creates unclaimed children linked to the parent', async () => {
     const parent = await seedCoral({ ownerId: owner.id });
