@@ -50,13 +50,37 @@ export async function reviewPhoto(
   note?: string
 ): Promise<void> {
   const admin = await getCurrentAdmin();
+
+  // Needed before the paths can be revalidated, and the row is still there
+  // either way — a decision does not delete the photo.
+  const { rows } = await pool.query<{ coralId: string; rfCode: string | null }>(
+    `SELECT c.id AS "coralId", c."rfCode"
+     FROM public."CoralPhoto" p
+     JOIN public."Coral" c ON c.id = p."coralId"
+     WHERE p.id = $1`,
+    [photoId]
+  );
+
   await pool.query(
     `UPDATE public."CoralPhoto"
      SET status = $1::"PhotoStatus", "reviewedBy" = $2, "reviewedAt" = NOW(), "reviewNote" = $3
      WHERE id = $4`,
     [decision, admin.id, note ?? null, photoId]
   );
+
   revalidatePath('/admin/photos');
+
+  // Approving used to change nothing a visitor could see. Every page showing
+  // photos is ISR-cached, and only /admin/photos was invalidated — so the home
+  // page kept serving its cached copy for a full hour (revalidate = 3600),
+  // /explore and /coral/[rfCode] for a minute each. /feed and /users are
+  // force-dynamic and need nothing.
+  revalidatePath('/');
+  revalidatePath('/explore');
+
+  const coral = rows[0];
+  if (coral?.rfCode) revalidatePath(`/coral/${coral.rfCode}`);
+  if (coral?.coralId) revalidatePath(`/collection/${coral.coralId}`);
 }
 
 export type ReviewedPhoto = PendingPhoto & {
