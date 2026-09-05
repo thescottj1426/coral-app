@@ -10,8 +10,9 @@ vi.mock('@/lib/db', async () => ({ pool: (await import('@/test/db')).testPool })
 const sendEmail = vi.fn().mockResolvedValue(undefined);
 vi.mock('@/lib/email', () => ({ sendEmail: (...a: unknown[]) => sendEmail(...a) }));
 
-const { createSpecimen, updateSpecimen, deleteSpecimen, restoreSpecimen, getPublicSpecimen } =
+const { createSpecimen, updateSpecimen, deleteSpecimen, restoreSpecimen, getPublicSpecimen, addSpecimenPhoto } =
   await import('./specimens');
+const { getChildren } = await import('./lineage');
 
 let owner: Awaited<ReturnType<typeof seedUser>>;
 let other: Awaited<ReturnType<typeof seedUser>>;
@@ -267,5 +268,75 @@ describe('getPublicSpecimen', () => {
       [coral.id]
     );
     expect((await getPublicSpecimen('RF-PUB2'))?.coverPhotoUrl).toBeNull();
+  });
+});
+
+describe('photographing an unclaimed frag', () => {
+  // Every frag photo before this landed nowhere: the only camera button lived
+  // in the cutting modal, and a pending photo on an ownerless frag was
+  // invisible even to the keeper holding the plug.
+  async function parentWithUnclaimedFrag() {
+    const parent = await seedCoral({ ownerId: owner.id, rfCode: 'RF-PAR1' });
+    const frag = await seedCoral({ ownerId: null, rfCode: 'RF-FRG1' });
+    await testPool.query(
+      `INSERT INTO public."Lineage" (id, "parentId", "childId", "createdAt")
+       VALUES (gen_random_uuid()::text, $1, $2, NOW())`,
+      [parent.id, frag.id]
+    );
+    return { parent, frag };
+  }
+
+  const photosOf = async (coralId: string) => {
+    const { rows } = await testPool.query<{ n: string }>(
+      'SELECT COUNT(*)::text AS n FROM public."CoralPhoto" WHERE "coralId" = $1',
+      [coralId]
+    );
+    return Number(rows[0].n);
+  };
+
+  it("lets the parent's owner attach a photo", async () => {
+    const { frag } = await parentWithUnclaimedFrag();
+    await addSpecimenPhoto({ specimenId: frag.id, photoKey: 'k1', photoUrl: '/api/image?key=k1' });
+    expect(await photosOf(frag.id)).toBe(1);
+  });
+
+  it('refuses an unrelated user', async () => {
+    const { frag } = await parentWithUnclaimedFrag();
+    currentUser.mockResolvedValue(other);
+    await expect(
+      addSpecimenPhoto({ specimenId: frag.id, photoKey: 'k2', photoUrl: '/api/image?key=k2' })
+    ).rejects.toThrow(/Not authorized/);
+    expect(await photosOf(frag.id)).toBe(0);
+  });
+
+  // The frag's own public page still shows approved photos only — it is ISR
+  // cached for crawlers and must not vary per viewer. The keeper sees the photo
+  // on the parent's page instead, which is where the camera button lives.
+  it('surfaces the photo to the keeper through the parent', async () => {
+    const { parent, frag } = await parentWithUnclaimedFrag();
+    await addSpecimenPhoto({ specimenId: frag.id, photoKey: 'k3', photoUrl: '/api/image?key=k3' });
+
+    const children = await getChildren(parent.id);
+    expect(children).toHaveLength(1);
+    expect(children[0].id).toBe(frag.id);
+    expect(children[0].photoUrl).toBe('/api/image?key=k3');
+  });
+
+  it('keeps the pending photo off the public page', async () => {
+    const { frag } = await parentWithUnclaimedFrag();
+    await addSpecimenPhoto({ specimenId: frag.id, photoKey: 'k4', photoUrl: '/api/image?key=k4' });
+
+    expect((await getPublicSpecimen('RF-FRG1'))?.photos).toHaveLength(0);
+    expect(frag.id).toBeTruthy();
+  });
+
+  it('serves the photo through the proxy, never a raw S3 url', async () => {
+    const { parent, frag } = await parentWithUnclaimedFrag();
+    await addSpecimenPhoto({ specimenId: frag.id, photoKey: 'k5', photoUrl: '/api/image?key=k5' });
+
+    const url = (await getChildren(parent.id))[0].photoUrl ?? '';
+    expect(url).toContain('/api/image?key=');
+    expect(url).not.toContain('amazonaws.com');
+    expect(frag.id).toBeTruthy();
   });
 });

@@ -105,6 +105,52 @@ describe('FragRow', () => {
     });
   });
 
+  describe('after uploading a photo', () => {
+    // The blank-photo bug: /api/upload used to return a direct S3 URL, the
+    // bucket is private, and the thumbnail rendered as nothing.
+    it('renders the returned url through the image proxy, never a raw S3 url', async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ url: '/api/image?key=specimens%2Fu1%2Fx.jpg', key: 'specimens/u1/x.jpg' }),
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      addSpecimenPhoto.mockResolvedValueOnce(undefined);
+
+      const user = userEvent.setup();
+      const { container } = renderWithMantine(<FragRow frag={unclaimed} index={0} />);
+
+      const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+      await user.upload(input, new File(['x'], 'x.jpg', { type: 'image/jpeg' }));
+
+      const img = await screen.findByAltText('Frag RF-BVHJ');
+      const src = img.getAttribute('src') ?? '';
+      expect(src).not.toContain('amazonaws.com');
+      expect(decodeURIComponent(src)).toContain('/api/image');
+
+      vi.unstubAllGlobals();
+    });
+
+    it('attaches the photo to the frag it was taken for', async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ url: '/api/image?key=k', key: 'k' }),
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      addSpecimenPhoto.mockResolvedValueOnce(undefined);
+
+      const user = userEvent.setup();
+      const { container } = renderWithMantine(<FragRow frag={unclaimed} index={0} />);
+      const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+      await user.upload(input, new File(['x'], 'x.jpg', { type: 'image/jpeg' }));
+
+      expect(addSpecimenPhoto).toHaveBeenCalledWith(
+        expect.objectContaining({ specimenId: 'c1', photoKey: 'k' })
+      );
+
+      vi.unstubAllGlobals();
+    });
+  });
+
   it('always offers the code itself for copying', () => {
     renderWithMantine(<FragRow frag={kept} index={0} />);
     expect(screen.getByLabelText('Copy RF-TFEG')).toBeInTheDocument();

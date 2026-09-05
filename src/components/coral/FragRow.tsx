@@ -12,7 +12,7 @@ import { setFragRecipient } from '@/app/actions/lineage';
 
 const MONO = 'var(--font-ibm-plex-mono), monospace';
 
-export type LoggedFrag = { id: string; rfCode: string; kept: boolean };
+export type LoggedFrag = { id: string; rfCode: string; kept: boolean; photoUrl?: string | null };
 
 /**
  * One logged frag. Two dispositions, decided per plug:
@@ -23,7 +23,7 @@ export type LoggedFrag = { id: string; rfCode: string; kept: boolean };
  * unclaimed and the caller owning its parent; the permission lapses on claim.
  */
 export function FragRow({ frag, index }: { frag: LoggedFrag; index: number }) {
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(frag.photoUrl ?? null);
   const [uploading, setUploading] = useState(false);
   const [recipient, setRecipient] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);

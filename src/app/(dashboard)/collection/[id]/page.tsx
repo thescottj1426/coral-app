@@ -15,6 +15,7 @@ import {
   AddPhotoButton,
 } from './SpecimenDetailClient';
 import { RfCodeQr } from '@/components/specimen/RfCodeQr';
+import { UnclaimedFragList } from '@/components/coral/UnclaimedFragList';
 import { stageLabel, effectiveGeneration, statusLabel } from '@/lib/coralStage';
 import styles from './specimen.module.css';
 
@@ -85,6 +86,10 @@ export default async function SpecimenDetailPage({ params }: Props) {
   const age = ageLabel(specimen.acquiredDate, specimen.createdAt);
 
   const approvedPhotos = specimen.photos.filter(p => p.status === 'approved' || isOwner);
+
+  const unclaimedFrags = frags
+    .filter(f => !f.ownerUsername && f.rfCode)
+    .map(f => ({ id: f.id, rfCode: f.rfCode as string, kept: false, photoUrl: f.photoUrl ?? null }));
 
   return (
     <div>
@@ -343,6 +348,18 @@ export default async function SpecimenDetailPage({ params }: Props) {
                   </div>
                 </>
               )}
+            </div>
+          )}
+
+          {isOwner && unclaimedFrags.length > 0 && (
+            <div className={styles.card}>
+              <span className={styles.eyebrow}>
+                Unclaimed frags · {unclaimedFrags.length}
+              </span>
+              <p style={{ fontSize: 12, color: '#8a929c', margin: '4px 0 12px' }}>
+                Photograph a plug or note who took it. Still yours to hand out until someone claims the code.
+              </p>
+              <UnclaimedFragList frags={unclaimedFrags} />
             </div>
           )}
 

@@ -4,7 +4,7 @@ import { headers } from 'next/headers';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { auth } from '@/lib/auth';
-import { s3, S3_BUCKET, s3PublicUrl } from '@/lib/s3';
+import { s3, S3_BUCKET, imageProxyUrl } from '@/lib/s3';
 
 export async function getUploadUrl(
   contentType: string,
@@ -22,5 +22,5 @@ export async function getUploadUrl(
   });
 
   const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
-  return { uploadUrl, publicUrl: s3PublicUrl(key), key };
+  return { uploadUrl, publicUrl: imageProxyUrl(key), key };
 }

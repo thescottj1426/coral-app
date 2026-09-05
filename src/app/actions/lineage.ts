@@ -18,6 +18,8 @@ export type LineageNode = {
   depth: number;
   generationFromMother: number | null;
   parentStageAtCut: CoralStage | null;
+  /** Latest photo, approved or not — only getChildren populates it. */
+  photoUrl?: string | null;
 };
 
 export async function getLineage(specimenId: string): Promise<LineageNode[]> {
@@ -46,7 +48,14 @@ export async function getLineage(specimenId: string): Promise<LineageNode[]> {
 export async function getChildren(specimenId: string): Promise<LineageNode[]> {
   const { rows } = await pool.query<LineageNode>(
     `SELECT c.id, c.name, c."rfCode", c."identityHue", u.username AS "ownerUsername", 1 AS depth,
-            c."generationFromMother", l."parentStageAtCut"
+            c."generationFromMother", l."parentStageAtCut",
+            -- The frag's own page only shows approved photos, so without this
+            -- the keeper who photographed a plug has nowhere to see it.
+            (SELECT '/api/image?key=' || p."s3Key"
+               FROM public."CoralPhoto" p
+              WHERE p."coralId" = c.id
+              ORDER BY p."createdAt" DESC
+              LIMIT 1) AS "photoUrl"
      FROM public."Lineage" l
      JOIN public."Coral" c ON c.id = l."childId"
      LEFT JOIN public."User" u ON u.id = c."ownerId"
