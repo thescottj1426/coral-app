@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { auth } from '@/lib/auth';
-import { s3, S3_BUCKET, s3PublicUrl } from '@/lib/s3';
+import { s3, S3_BUCKET, imageProxyUrl } from '@/lib/s3';
 
 export async function POST(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers });
@@ -33,5 +33,5 @@ export async function POST(request: NextRequest) {
     })
   );
 
-  return NextResponse.json({ url: s3PublicUrl(key), key });
+  return NextResponse.json({ url: imageProxyUrl(key), key });
 }
