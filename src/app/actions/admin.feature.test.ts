@@ -59,14 +59,6 @@ describe('reviewPhoto', () => {
     expect(rows[0].reviewedBy).toBe(admin.id);
   });
 
-  // The bug: approving only revalidated /admin/photos, so the home page kept
-  // serving its cached copy for a full hour and the photo never appeared.
-  it('revalidates the home page, which caches for an hour', async () => {
-    const { photoId } = await pendingPhoto('RF-REV2');
-    await reviewPhoto(photoId, 'approved');
-    expect(revalidatePath).toHaveBeenCalledWith('/');
-  });
-
   it('revalidates explore', async () => {
     const { photoId } = await pendingPhoto('RF-REV3');
     await reviewPhoto(photoId, 'approved');
@@ -90,7 +82,7 @@ describe('reviewPhoto', () => {
   it('revalidates on rejection as well', async () => {
     const { photoId } = await pendingPhoto('RF-REV6');
     await reviewPhoto(photoId, 'rejected', 'blurry');
-    expect(revalidatePath).toHaveBeenCalledWith('/');
+    expect(revalidatePath).toHaveBeenCalledWith('/explore');
     expect(revalidatePath).toHaveBeenCalledWith('/coral/RF-REV6');
   });
 

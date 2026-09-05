@@ -11,7 +11,15 @@ import styles from './home.module.css';
 
 const BASE = siteUrl();
 
-export const revalidate = 3600;
+// Queried per request rather than cached, matching /feed and /users. An
+// approved photo appears immediately instead of waiting out a cache window,
+// and no mutation has to know which pages happen to display photos — that map
+// was invisible from the action that changed the data, and silently wrong.
+//
+// The queries here are small and the audience is tiny. If traffic ever makes
+// this worth caching, `revalidate = 60` is the setting — but then approving a
+// photo has to revalidate this path explicitly again.
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Coral Chest — trace the lineage of every coral',
