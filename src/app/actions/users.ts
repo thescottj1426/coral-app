@@ -254,7 +254,8 @@ export async function unfollowUser(targetUserId: string): Promise<void> {
   revalidatePath(`/users`);
 }
 
-export async function getIsFollowing(viewerId: string, targetUserId: string): Promise<boolean> {
+export async function getIsFollowing(targetUserId: string): Promise<boolean> {
+  const { id: viewerId } = await getCurrentUser();
   try {
     const { rows } = await pool.query(
       `SELECT 1 FROM public."Follow" WHERE "followerId" = $1 AND "followingId" = $2 LIMIT 1`,

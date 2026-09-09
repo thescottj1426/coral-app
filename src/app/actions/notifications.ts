@@ -3,7 +3,9 @@
 import { pool } from '@/lib/db';
 import { getCurrentUser } from '@/lib/getCurrentUser';
 
-export type NotificationType = 'LIKE' | 'COMMENT' | 'FOLLOW' | 'REPLY' | 'BEST_ANSWER' | 'FRAG_CLAIMED';
+import type { NotificationType } from '@/lib/notifications';
+export type { NotificationType };
+
 
 export type NotificationRow = {
   id: string;
@@ -16,20 +18,6 @@ export type NotificationRow = {
   createdAt: string;
 };
 
-export async function createNotification(data: {
-  userId: string;
-  type: NotificationType;
-  fromUserId?: string;
-  targetType?: string;
-  targetId?: string;
-}): Promise<void> {
-  if (data.fromUserId && data.fromUserId === data.userId) return;
-  await pool.query(
-    `INSERT INTO public."Notification" (id, "userId", type, "fromUserId", "targetType", "targetId")
-     VALUES (gen_random_uuid()::text, $1, $2::"NotificationType", $3, $4, $5)`,
-    [data.userId, data.type, data.fromUserId ?? null, data.targetType ?? null, data.targetId ?? null]
-  );
-}
 
 export async function getUnreadCount(): Promise<number> {
   const user = await getCurrentUser();

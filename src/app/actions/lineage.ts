@@ -5,7 +5,7 @@ import { pool } from '@/lib/db';
 import { imageProxyUrl } from '@/lib/s3';
 import { getCurrentUser } from '@/lib/getCurrentUser';
 import { uniqueRFCode } from '@/lib/rfCode';
-import { createNotification } from '@/app/actions/notifications';
+import { createNotification } from '@/lib/notifications';
 import { checkSpecimenCap } from '@/lib/entitlements';
 import type { CoralStage } from '@/app/actions/specimens';
 import { invariant } from '@/lib/log';
