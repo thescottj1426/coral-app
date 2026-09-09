@@ -16,9 +16,9 @@ export default async function MyCollectionPage() {
   }
 
   const [specimens, stats, listings] = await Promise.all([
-    getMySpecimens(user.id),
-    getDashboardStats(user.id),
-    getMyListings(user.id),
+    getMySpecimens(),
+    getDashboardStats(),
+    getMyListings(),
   ]);
 
   const firstName = (user.name ?? user.email ?? 'Keeper').split(' ')[0];

@@ -72,7 +72,7 @@ export default async function UserProfilePage({
   const [specimens, bloodlines, isFollowing] = await Promise.all([
     getUserSpecimens(p.id),
     getUserBloodlines(p.id),
-    viewerId && !own ? getIsFollowing(viewerId, p.id) : Promise.resolve(false),
+    viewerId && !own ? getIsFollowing(p.id) : Promise.resolve(false),
   ]);
 
   const displayName = p.displayName ?? p.username;

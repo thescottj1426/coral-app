@@ -41,8 +41,11 @@ export type SpecimenRow = {
   coverPhotoPending: boolean | null;
 };
 
-export async function getMySpecimens(userId?: string): Promise<SpecimenRow[]> {
-  const user = userId ? { id: userId } : await getCurrentUser();
+// The userId parameter is gone deliberately. This is a 'use server' export, so
+// a parameter is something any caller can supply — and these rows carry notes,
+// vendor and givenTo, none of which appear on a public profile.
+export async function getMySpecimens(): Promise<SpecimenRow[]> {
+  const user = await getCurrentUser();
   const { rows } = await pool.query<Omit<SpecimenRow, 'coverPhotoUrl'> & { coverKey: string | null }>(
     `SELECT
        c.id, c.name, c.species, c.category, c."rfCode", c.origin, c.notes,

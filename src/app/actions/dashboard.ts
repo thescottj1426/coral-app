@@ -1,7 +1,7 @@
 'use server';
 
 import { pool } from '@/lib/db';
-import { imageProxyUrl } from '@/lib/s3';
+import { getCurrentUser } from '@/lib/getCurrentUser';
 
 export type DashboardStats = {
   coralCount: number;
@@ -9,16 +9,6 @@ export type DashboardStats = {
   fragsReceived: number;
 };
 
-export type DashboardCoral = {
-  id: string;
-  name: string;
-  rfCode: string | null;
-  identityHue: number | null;
-  category: string | null;
-  coverUrl: string | null;
-  coverPending: boolean | null;
-  createdAt: string;
-};
 
 export type MyListing = {
   id: string;
@@ -29,7 +19,10 @@ export type MyListing = {
   qty: number | null;
 };
 
-export async function getDashboardStats(userId: string): Promise<DashboardStats> {
+// No userId parameter: these are 'use server' exports, so a parameter is an
+// argument any caller can supply — including one asking about someone else.
+export async function getDashboardStats(): Promise<DashboardStats> {
+  const { id: userId } = await getCurrentUser();
   const { rows } = await pool.query<DashboardStats>(
     `SELECT
        (SELECT COUNT(*)::int FROM public."Coral" WHERE "ownerId" = $1) AS "coralCount",
@@ -42,80 +35,10 @@ export async function getDashboardStats(userId: string): Promise<DashboardStats>
   return rows[0];
 }
 
-export async function getRecentCorals(userId: string, limit = 4): Promise<DashboardCoral[]> {
-  const { rows } = await pool.query<Omit<DashboardCoral, 'coverUrl'> & { coverKey: string | null }>(
-    `SELECT c.id, c.name, c."rfCode", c."identityHue", c.category, c."createdAt",
-       (SELECT p."s3Key" FROM public."CoralPhoto" p WHERE p."coralId" = c.id ORDER BY CASE WHEN p.status = 'approved' THEN 0 ELSE 1 END, p."createdAt" ASC LIMIT 1) AS "coverKey",
-       (SELECT p.status = 'pending' FROM public."CoralPhoto" p WHERE p."coralId" = c.id ORDER BY CASE WHEN p.status = 'approved' THEN 0 ELSE 1 END, p."createdAt" ASC LIMIT 1) AS "coverPending"
-     FROM public."Coral" c
-     WHERE c."ownerId" = $1
-     ORDER BY c."createdAt" DESC
-     LIMIT $2`,
-    [userId, limit]
-  );
-  return rows.map(({ coverKey, ...r }) => ({
-    ...r,
-    coverUrl: coverKey ? imageProxyUrl(coverKey) : null,
-  }));
-}
 
-export type MyActivity = {
-  id: string;
-  kind: 'specimen' | 'lineage' | 'listing';
-  createdAt: string;
-  specimenName: string;
-  specimenRfCode: string | null;
-  parentName: string | null;
-};
 
-export async function getMyActivity(userId: string, limit = 8): Promise<MyActivity[]> {
-  const { rows } = await pool.query<MyActivity>(
-    `SELECT id, kind, "createdAt", "specimenName", "specimenRfCode", "parentName" FROM (
-       SELECT
-         'specimen-' || c.id AS id,
-         'specimen'::text AS kind,
-         c."createdAt",
-         c.name AS "specimenName",
-         c."rfCode" AS "specimenRfCode",
-         NULL::text AS "parentName"
-       FROM public."Coral" c
-       WHERE c."ownerId" = $1 AND c."ownerId" IS NOT NULL
-
-       UNION ALL
-
-       SELECT
-         'lineage-' || l.id AS id,
-         'lineage'::text AS kind,
-         l."createdAt",
-         child.name AS "specimenName",
-         child."rfCode" AS "specimenRfCode",
-         parent.name AS "parentName"
-       FROM public."Lineage" l
-       JOIN public."Coral" child ON child.id = l."childId"
-       JOIN public."Coral" parent ON parent.id = l."parentId"
-       WHERE child."ownerId" = $1
-
-       UNION ALL
-
-       SELECT
-         'listing-' || fl.id AS id,
-         'listing'::text AS kind,
-         fl."createdAt",
-         c.name AS "specimenName",
-         c."rfCode" AS "specimenRfCode",
-         NULL::text AS "parentName"
-       FROM public."FragListing" fl
-       JOIN public."Coral" c ON c.id = fl."coralId"
-       WHERE fl."userId" = $1
-     ) events
-     ORDER BY "createdAt" DESC
-     LIMIT $2`,
-    [userId, limit]
-  );
-  return rows;
-}
-
-export async function getMyListings(userId: string): Promise<MyListing[]> {
+export async function getMyListings(): Promise<MyListing[]> {
+  const { id: userId } = await getCurrentUser();
   const { rows } = await pool.query<MyListing>(
     `SELECT fl.id, fl."coralId", c.name AS "coralName", c."identityHue",
             fl.price, fl.qty

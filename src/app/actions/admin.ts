@@ -116,6 +116,10 @@ export type OpenReport = {
 };
 
 export async function getOpenReports(): Promise<OpenReport[]> {
+  // Every other export here gates on this; this one did not. It returns
+  // reporterUsername alongside the reason, so an unguarded read hands the
+  // reported person the name of whoever reported them.
+  await getCurrentAdmin();
   const { rows } = await pool.query<OpenReport>(
     `SELECT
        r.id, r."targetType", r."targetId", r.reason, r."createdAt",
