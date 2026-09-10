@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { Box, Stack, Text, Badge, Paper, Group, SimpleGrid } from '@mantine/core';
+import Image from 'next/image';
+import Link from 'next/link';
+import { Badge, Button, CopyButton } from '@mantine/core';
 import { getPublicSpecimen, getMoreByOwner } from '@/app/actions/specimens';
 import { getLineage, getChildren } from '@/app/actions/lineage';
 import { CategoryBadge } from '@/components/specimen/CategoryBadge';
@@ -8,10 +10,15 @@ import { coralIdentityGradient } from '@/theme/theme';
 import { CtaBanner } from '@/components/coral/CtaBanner';
 import { stageLabel, statusLabel, statusColor } from '@/lib/coralStage';
 import { PublicPhotos } from './PublicPhotos';
+import { PhotoDropzone, CutFragButton, JoinStrip } from './OwnerControls';
 import { siteUrl } from '@/lib/siteUrl';
 import type { LineageNode } from '@/app/actions/lineage';
 import type { PublicSpecimenStub } from '@/app/actions/specimens';
+import styles from './coral.module.css';
 
+// Cached, and deliberately session-free. Owner controls resolve on the client
+// (OwnerControls) — reading the session here would make the route dynamic and
+// throw away the cache that exists for crawlers.
 export const revalidate = 60;
 
 interface Props {
@@ -71,97 +78,14 @@ function dateLabel(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function ageLabel(acquiredDate: string | null, createdAt: string) {
-  const weeks = Math.round((Date.now() - new Date(acquiredDate ?? createdAt).getTime()) / 604800000);
-  if (weeks < 1) return 'Just added';
-  if (weeks < 8) return `${weeks} week${weeks !== 1 ? 's' : ''}`;
-  return `${Math.round(weeks / 4.33)} month${Math.round(weeks / 4.33) !== 1 ? 's' : ''}`;
-}
-
-const EYEBROW: React.CSSProperties = {
-  fontFamily: 'var(--font-ibm-plex-mono), monospace',
-  fontSize: 10,
-  textTransform: 'uppercase',
-  letterSpacing: '0.1em',
-  color: 'var(--mantine-color-dimmed)',
-  fontWeight: 500,
-};
-
-function LineagePill({ node, dim }: { node: LineageNode; dim?: boolean }) {
-  const href = node.rfCode ? `/coral/${node.rfCode}` : null;
-  const bg = node.identityHue != null
-    ? `oklch(0.72 0.10 ${node.identityHue})`
-    : `var(--mantine-color-gray-3)`;
-
-  const inner = (
-    <Group gap={6} wrap="nowrap" style={{ opacity: dim ? 0.6 : 1 }}>
-      <Box style={{ width: 10, height: 10, borderRadius: '50%', background: bg, flexShrink: 0 }} />
-      <Stack gap={0}>
-        <Text size="xs" fw={600} style={{ lineHeight: 1.2 }}>{node.name}</Text>
-        <Text size="xs" c="dimmed">
-          {node.ownerUsername ? `@${node.ownerUsername}` : 'Unclaimed'}
-          {node.parentStageAtCut ? ` · ${stageLabel(node.parentStageAtCut)}` : ''}
-        </Text>
-      </Stack>
-    </Group>
-  );
-
-  if (!href) return <Box style={pillStyle}>{inner}</Box>;
-  return (
-    <Box component="a" href={href} style={{ ...pillStyle, textDecoration: 'none', color: 'inherit' }}>
-      {inner}
-    </Box>
-  );
-}
-
-const pillStyle: React.CSSProperties = {
-  border: '1px solid var(--mantine-color-default-border)',
-  borderRadius: 'var(--mantine-radius-sm)',
-  padding: '6px 10px',
-  background: 'var(--mantine-color-body)',
-  display: 'inline-flex',
-  alignItems: 'center',
-};
-
-function CoralStubCard({ c }: { c: PublicSpecimenStub }) {
-  const href = `/coral/${c.rfCode ?? c.id}`;
-  const bg = c.identityHue != null
-    ? `linear-gradient(135deg, oklch(0.76 0.11 ${c.identityHue}), oklch(0.5 0.13 ${c.identityHue}))`
-    : coralIdentityGradient(c.id);
-
-  return (
-    <Box
-      component="a"
-      href={href}
-      style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
-    >
-      <Paper withBorder style={{ overflow: 'hidden' }}>
-        <Box style={{ height: 84, position: 'relative', overflow: 'hidden' }}>
-          {c.coverPhotoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={c.coverPhotoUrl} alt={c.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          ) : (
-            <Box style={{ height: '100%', background: bg }} />
-          )}
-        </Box>
-        <Box p="xs">
-          <Text size="xs" fw={700} truncate>{c.name}</Text>
-          {c.category && (
-            <Text size="xs" c="dimmed" style={{ fontSize: 10 }}>{c.category}</Text>
-          )}
-        </Box>
-      </Paper>
-    </Box>
-  );
-}
-
 export default async function PublicCoralPage({ params }: Props) {
   const { rfCode } = await params;
   const specimen = await getPublicSpecimen(rfCode);
   if (!specimen) notFound();
 
   // Unclaimed frag — a createFrags row that stays ownerless until someone
-  // claims the RF code. This is the page a frag tag's QR resolves to.
+  // claims the RF code. This is the page a frag tag's QR resolves to, so it may
+  // be the first thing a new keeper ever sees.
   const unclaimed = specimen.ownerId === null;
 
   const [ancestors, children, more] = await Promise.all([
@@ -170,9 +94,9 @@ export default async function PublicCoralPage({ params }: Props) {
     specimen.ownerId ? getMoreByOwner(specimen.ownerId, specimen.id, 4) : Promise.resolve([]),
   ]);
 
-  const coverPhoto = specimen.photos[0] ?? null;
   // The frag itself has no owner; whoever owns its nearest ancestor cut it.
   const fraggedBy = ancestors[ancestors.length - 1]?.ownerUsername ?? null;
+  const keeperHandle = specimen.ownerUsername;
 
   // Structured data: tells Google the RF code is an identifier and exposes
   // stage/lineage as properties, making the page eligible for rich results.
@@ -207,273 +131,290 @@ export default async function PublicCoralPage({ params }: Props) {
     ],
   };
 
+  // Oldest ancestor first, then this coral. The chain reads top-down as
+  // generations, which is how keepers describe provenance out loud.
+  const chain = [
+    ...ancestors.map((a: LineageNode, i: number) => ({
+      key: a.id,
+      gen: i + 1,
+      name: a.name,
+      handle: a.ownerUsername,
+      href: a.rfCode ? `/coral/${a.rfCode}` : null,
+      meta: [a.rfCode, stageLabel(a.parentStageAtCut)].filter(Boolean).join(' · ') || null,
+      current: false,
+    })),
+    {
+      key: specimen.id,
+      gen: ancestors.length + 1,
+      name: specimen.name,
+      handle: keeperHandle,
+      href: null,
+      meta: [specimen.rfCode, stageLabel(specimen.stage)].filter(Boolean).join(' · ') || null,
+      current: true,
+    },
+  ];
+
   return (
-    <Box maw={1080} mx="auto" py="lg" px="md">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
-      />
-      <CtaBanner />
+    <div className={styles.page}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
 
-      {/* Hero — clicking it opens the lightbox at photo 0 */}
-      <Box style={{ height: 260, borderRadius: 'var(--mantine-radius-md)', overflow: 'hidden', position: 'relative', marginBottom: 16 }}>
-        {coverPhoto ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={coverPhoto.url}
-            alt={specimen.name}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          />
-        ) : (
-          <Box style={{ height: '100%', background: coralIdentityGradient(specimen.rfCode ?? specimen.id) }} />
-        )}
-        <Box style={{
-          position: 'absolute', inset: 0,
-          background: 'linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 55%)',
-        }} />
-        <Stack gap={4} style={{ position: 'absolute', bottom: 20, left: 20 }}>
-          <Group gap={8}>
+      <JoinStrip />
+
+      <div className={styles.shell}>
+        <div className={styles.photoBand}>
+          {specimen.photos.length > 0 ? (
+            <PublicPhotos photos={specimen.photos} specimenName={specimen.name} mode="overlay" />
+          ) : (
+            <PhotoDropzone
+              coralId={specimen.id}
+              ownerUsername={keeperHandle}
+              label={`Drop the ${specimen.name} photo or browse files`}
+              fallback={
+                <div
+                  aria-hidden
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    background: coralIdentityGradient(specimen.rfCode ?? specimen.id),
+                    opacity: 0.55,
+                  }}
+                />
+              }
+            />
+          )}
+        </div>
+
+        <div className={styles.columns}>
+          <div>
+            <div className={styles.card}>
+              <div className={styles.badges}>
+                {specimen.category && <CategoryBadge category={specimen.category} />}
+                {specimen.origin && <Badge variant="default" size="sm" radius="sm">{specimen.origin}</Badge>}
+                {statusLabel(specimen.status) && (
+                  <Badge color={statusColor(specimen.status)} variant="light" size="sm" radius="sm">
+                    {statusLabel(specimen.status)}
+                  </Badge>
+                )}
+              </div>
+              <h1 className={styles.name}>{specimen.name}</h1>
+              {specimen.species && <p className={styles.species}>{specimen.species}</p>}
+            </div>
+
+            {specimen.rfCode && (
+              <div className={styles.card}>
+                <p className={styles.eyebrow}>RF code · written on the plug</p>
+                <div className={styles.rfRow}>
+                  <p className={styles.rfCode}>{specimen.rfCode}</p>
+                  <CopyButton value={specimen.rfCode} timeout={2000}>
+                    {({ copied, copy }) => (
+                      <Button variant="default" size="xs" onClick={copy}>
+                        {copied ? 'Copied' : 'Copy'}
+                      </Button>
+                    )}
+                  </CopyButton>
+                </div>
+              </div>
+            )}
+
+            <div className={styles.card}>
+              <p className={styles.eyebrow}>Provenance</p>
+
+              {chain.map((row) => {
+                const inner = (
+                  <>
+                    <span className={`${styles.genLabel} ${row.current ? styles.genLabelCurrent : ''}`}>
+                      Gen {row.gen}
+                    </span>
+                    <span style={{ minWidth: 0 }}>
+                      <span className={styles.genName}>{row.name}</span>
+                      <span className={styles.genMeta} style={{ display: 'block' }}>
+                        {row.handle ? `@${row.handle}` : 'Unclaimed'}
+                        {row.meta ? ` · ${row.meta}` : ''}
+                      </span>
+                    </span>
+                    <span className={styles.genAction}>{row.current ? 'This coral' : 'Open →'}</span>
+                  </>
+                );
+
+                return row.href ? (
+                  <Link
+                    key={row.key}
+                    href={row.href}
+                    className={styles.genRow}
+                    style={{ textDecoration: 'none', color: 'inherit' }}
+                  >
+                    {inner}
+                  </Link>
+                ) : (
+                  <div key={row.key} className={`${styles.genRow} ${row.current ? styles.genRowCurrent : ''}`}>
+                    {inner}
+                  </div>
+                );
+              })}
+
+              {children.length > 0 ? (
+                <div style={{ marginTop: 16 }}>
+                  <p className={styles.eyebrow}>Frags cut from this · {children.length}</p>
+                  {children.map((c: LineageNode) => (
+                    <Link
+                      key={c.id}
+                      href={`/coral/${c.rfCode ?? c.id}`}
+                      className={styles.genRow}
+                      style={{ textDecoration: 'none', color: 'inherit' }}
+                    >
+                      <span className={styles.genLabel}>Gen {chain.length + 1}</span>
+                      <span style={{ minWidth: 0 }}>
+                        <span className={styles.genName}>{c.rfCode ?? c.name}</span>
+                        <span className={styles.genMeta} style={{ display: 'block' }}>
+                          {c.ownerUsername ? `@${c.ownerUsername}` : 'Unclaimed — waiting on its keeper'}
+                        </span>
+                      </span>
+                      <span className={styles.genAction}>Open →</span>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className={styles.emptyBranch}>
+                  <span>
+                    No frags cut yet. The first cut issues a new RF code and starts the branch
+                    below this one.
+                  </span>
+                  <CutFragButton
+                    coralId={specimen.id}
+                    rfCode={specimen.rfCode ?? specimen.id}
+                    name={specimen.name}
+                    stage={specimen.stage}
+                    ownerUsername={keeperHandle}
+                  />
+                </div>
+              )}
+            </div>
+
+            {specimen.notes && (
+              <div className={styles.card}>
+                <p className={styles.eyebrow}>Keeper notes</p>
+                <p className={styles.notes}>{specimen.notes}</p>
+              </div>
+            )}
+
             {unclaimed && (
-              <Badge variant="filled" size="sm" radius="xl" color="ocean">
-                Unclaimed frag
-              </Badge>
+              <div className={styles.card}>
+                <p className={styles.eyebrow}>Unclaimed</p>
+                <p className={styles.notes} style={{ marginBottom: 14 }}>
+                  {fraggedBy
+                    ? `This plug was cut by @${fraggedBy} and has not been claimed yet. If it is in your tank, the code on the plug makes it yours.`
+                    : 'This plug has not been claimed yet. If it is in your tank, the code on the plug makes it yours.'}
+                </p>
+                <Button component="a" href={`/claim?code=${specimen.rfCode ?? ''}`} color="ocean">
+                  Claim this coral
+                </Button>
+                <CtaBanner />
+              </div>
             )}
-            {statusLabel(specimen.status) && (
-              <Badge variant="filled" size="sm" radius="xl" color={statusColor(specimen.status)}>
-                {statusLabel(specimen.status)}
-              </Badge>
-            )}
-            {specimen.category && <CategoryBadge category={specimen.category} />}
-            {specimen.origin && (
-              <Badge variant="filled" size="sm" radius="xl"
-                style={{ background: 'rgba(255,255,255,0.18)', backdropFilter: 'blur(4px)', color: '#fff' }}
-              >
-                {specimen.origin}
-              </Badge>
-            )}
-          </Group>
-          <Text
-            component="h1"
-            style={{ fontSize: 28, fontFamily: 'var(--font-sora)', fontWeight: 700, color: '#fff', margin: 0, lineHeight: 1.1 }}
-          >
-            {specimen.name}
-          </Text>
-          {specimen.species && (
-            <Text style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontStyle: 'italic' }}>
-              {specimen.species}
-            </Text>
-          )}
-        </Stack>
-        {coverPhoto && (
-          <PublicPhotos
-            photos={specimen.photos.map((p) => ({ id: p.id, url: p.url, status: p.status }))}
-            specimenName={specimen.name}
-            mode="overlay"
-          />
-        )}
-      </Box>
+          </div>
 
-      {/* Meta row */}
-      <Paper withBorder p="md" mb="md">
-        <Group gap="xl">
-          {specimen.rfCode && (
-            <Stack gap={0}>
-              <Text style={EYEBROW}>RF code</Text>
-              <Text size="sm" fw={600} style={{ fontFamily: 'var(--font-ibm-plex-mono), monospace' }}>
-                {specimen.rfCode}
-              </Text>
-            </Stack>
-          )}
-          <Stack gap={0}>
-            <Text style={EYEBROW}>{unclaimed ? 'fragged by' : 'collector'}</Text>
-            {specimen.ownerUsername ? (
-              <Text
-                component="a"
-                href={`/users/${specimen.ownerUsername}`}
-                size="sm" fw={600}
-                style={{ color: 'var(--mantine-primary-color-filled)', textDecoration: 'none' }}
-              >
-                @{specimen.ownerUsername}
-              </Text>
-            ) : fraggedBy ? (
-              <Text
-                component="a"
-                href={`/users/${fraggedBy}`}
-                size="sm" fw={600}
-                style={{ color: 'var(--mantine-primary-color-filled)', textDecoration: 'none' }}
-              >
-                @{fraggedBy}
-              </Text>
-            ) : (
-              <Text size="sm" fw={600} c="dimmed">Not yet claimed</Text>
-            )}
-          </Stack>
-          {specimen.stage && (
-            <Stack gap={0}>
-              <Text style={EYEBROW}>stage</Text>
-              <Text size="sm" fw={600}>{stageLabel(specimen.stage)}</Text>
-            </Stack>
-          )}
-          {specimen.vendor && (
-            <Stack gap={0}>
-              <Text style={EYEBROW}>farm / seller</Text>
-              <Text size="sm" fw={600}>{specimen.vendor}</Text>
-            </Stack>
-          )}
-          {specimen.sourceColony && (
-            <Stack gap={0}>
-              <Text style={EYEBROW}>cut from</Text>
-              <Text size="sm" fw={600}>{specimen.sourceColony}</Text>
-            </Stack>
-          )}
-          {unclaimed && specimen.givenTo && (
-            <Stack gap={0}>
-              <Text style={EYEBROW}>given to</Text>
-              <Text size="sm" fw={600}>{specimen.givenTo}</Text>
-            </Stack>
-          )}
-          {specimen.origin && (
-            <Stack gap={0}>
-              <Text style={EYEBROW}>source</Text>
-              <Text size="sm" fw={600}>{specimen.origin}</Text>
-            </Stack>
-          )}
-          {/* Falls back to createdAt, matching the dashboard page — otherwise a
-              coral with no explicit acquired date shows a blank here and a real
-              date there. */}
-          <Stack gap={0}>
-            <Text style={EYEBROW}>acquired</Text>
-            <Text size="sm" fw={600}>{dateLabel(specimen.acquiredDate ?? specimen.createdAt)}</Text>
-          </Stack>
-          <Stack gap={0}>
-            <Text style={EYEBROW}>age in chest</Text>
-            <Text size="sm" fw={600}>{ageLabel(specimen.acquiredDate, specimen.createdAt)}</Text>
-          </Stack>
-          <Stack gap={0}>
-            <Text style={EYEBROW}>last updated</Text>
-            <Text size="sm" fw={600}>{dateLabel(specimen.updatedAt ?? specimen.createdAt)}</Text>
-          </Stack>
-        </Group>
-      </Paper>
+          <aside>
+            <div className={styles.card}>
+              <p className={styles.eyebrow}>Record</p>
+              <div className={styles.recordRow}>
+                <span className={styles.recordKey}>Keeper</span>
+                <span className={styles.recordValue}>
+                  {keeperHandle ? (
+                    <Link href={`/users/${keeperHandle}`} style={{ color: 'var(--link)' }}>
+                      @{keeperHandle}
+                    </Link>
+                  ) : (
+                    'Unclaimed'
+                  )}
+                </span>
+              </div>
+              {stageLabel(specimen.stage) && (
+                <div className={styles.recordRow}>
+                  <span className={styles.recordKey}>Stage</span>
+                  <span className={styles.recordValue}>{stageLabel(specimen.stage)}</span>
+                </div>
+              )}
+              <div className={styles.recordRow}>
+                <span className={styles.recordKey}>Status</span>
+                <span className={styles.recordValue}>{statusLabel(specimen.status) ?? 'Alive'}</span>
+              </div>
+              {specimen.origin && (
+                <div className={styles.recordRow}>
+                  <span className={styles.recordKey}>Source</span>
+                  <span className={styles.recordValue}>{specimen.origin}</span>
+                </div>
+              )}
+              {specimen.vendor && (
+                <div className={styles.recordRow}>
+                  <span className={styles.recordKey}>Vendor</span>
+                  <span className={styles.recordValue}>{specimen.vendor}</span>
+                </div>
+              )}
+              <div className={styles.recordRow}>
+                <span className={styles.recordKey}>Acquired</span>
+                <span className={styles.recordValue}>
+                  {dateLabel(specimen.acquiredDate ?? specimen.createdAt)}
+                </span>
+              </div>
+              <div className={styles.recordRow}>
+                <span className={styles.recordKey}>Updated</span>
+                <span className={styles.recordValue}>
+                  {dateLabel(specimen.updatedAt ?? specimen.createdAt)}
+                </span>
+              </div>
+            </div>
 
-      {/* Claim CTA — this page is where a frag tag's QR lands */}
-      {unclaimed && specimen.rfCode && (
-        <Paper
-          withBorder
-          p="md"
-          mb="md"
-          style={{ background: 'var(--mantine-color-ocean-0)', borderColor: 'var(--mantine-color-ocean-3)' }}
-        >
-          <Stack gap={10}>
-            <Stack gap={2}>
-              <Text size="sm" fw={700} c="ocean.9">Holding this frag?</Text>
-              <Text size="xs" c="ocean.8" style={{ lineHeight: 1.6 }}>
-                Claim it with code <strong>{specimen.rfCode}</strong> to add it to your collection
-                and inherit the full lineage above.
-              </Text>
-            </Stack>
-            <Box
-              component="a"
-              href={`/claim?code=${specimen.rfCode}`}
-              style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                alignSelf: 'flex-start',
-                background: 'var(--mantine-primary-color-filled)', color: '#fff',
-                padding: '8px 18px', borderRadius: 'var(--mantine-radius-sm)',
-                textDecoration: 'none', fontSize: 14, fontWeight: 600,
-              }}
-            >
-              Claim this frag
-            </Box>
-          </Stack>
-        </Paper>
-      )}
+            <div className={styles.card}>
+              <p className={styles.eyebrow}>Photos · {specimen.photos.length}</p>
+              {specimen.photos.length > 0 && (
+                <div className={styles.photoGrid} style={{ marginBottom: 10 }}>
+                  {specimen.photos.map((photo) => (
+                    <div key={photo.id} className={styles.photoTile}>
+                      <Image src={photo.url} alt={specimen.name} fill sizes="140px" style={{ objectFit: 'cover' }} />
+                      {photo.status === 'pending' && <span className={styles.pendingTag}>Pending review</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <PhotoDropzone
+                coralId={specimen.id}
+                ownerUsername={keeperHandle}
+                label="Drop an image or browse files"
+                compact
+              />
+            </div>
 
-      {/* Notes */}
-      {specimen.notes && (
-        <Paper withBorder p="md" mb="md">
-          <Text style={{ ...EYEBROW, display: 'block', marginBottom: 8 }}>keeper notes</Text>
-          <Text size="sm" style={{ lineHeight: 1.65 }}>{specimen.notes}</Text>
-        </Paper>
-      )}
-
-      {/* Lineage */}
-      {(ancestors.length > 0 || children.length > 0) && (
-        <Paper withBorder p="md" mb="md">
-          <Text style={{ ...EYEBROW, display: 'block', marginBottom: 12 }}>lineage</Text>
-
-          {ancestors.length > 0 && (
-            <Box mb={children.length > 0 ? 'sm' : 0}>
-              <Text size="xs" c="dimmed" mb={8}>ancestry</Text>
-              <Group gap={6} align="center" wrap="wrap">
-                {ancestors.map((a, i) => (
-                  <Group key={a.id} gap={6} wrap="nowrap">
-                    <LineagePill node={a} dim={i < ancestors.length - 1} />
-                    <Text size="xs" c="dimmed">→</Text>
-                  </Group>
+            {more.length > 0 && keeperHandle && (
+              <div className={styles.card}>
+                <p className={styles.eyebrow}>More from @{keeperHandle}</p>
+                {more.map((m: PublicSpecimenStub) => (
+                  <Link key={m.id} href={`/coral/${m.rfCode ?? m.id}`} className={styles.relatedRow}>
+                    <span className={styles.relatedThumb}>
+                      {m.coverPhotoUrl ? (
+                        <Image src={m.coverPhotoUrl} alt={m.name} fill sizes="40px" style={{ objectFit: 'cover' }} />
+                      ) : (
+                        <span
+                          aria-hidden
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            background: coralIdentityGradient(m.rfCode ?? m.id),
+                          }}
+                        />
+                      )}
+                    </span>
+                    <span style={{ minWidth: 0 }}>
+                      <span className={styles.genName} style={{ display: 'block' }}>{m.name}</span>
+                      <span className={styles.genMeta}>{m.rfCode ?? ''}</span>
+                    </span>
+                  </Link>
                 ))}
-                <Box style={{ ...pillStyle, background: 'var(--mantine-color-ocean-0)', borderColor: 'var(--mantine-color-ocean-3)' }}>
-                  <Group gap={6}>
-                    <Box style={{
-                      width: 10, height: 10, borderRadius: '50%', flexShrink: 0,
-                      background: specimen.identityHue != null ? `oklch(0.72 0.10 ${specimen.identityHue})` : 'var(--mantine-color-ocean-4)',
-                    }} />
-                    <Text size="xs" fw={700} c="ocean.7">{specimen.name}</Text>
-                  </Group>
-                </Box>
-              </Group>
-            </Box>
-          )}
-
-          {children.length > 0 && (
-            <Box>
-              <Text size="xs" c="dimmed" mb={8}>frags given out · {children.length}</Text>
-              <Group gap={6} wrap="wrap">
-                {children.map((c) => (
-                  <LineagePill key={c.id} node={c} />
-                ))}
-              </Group>
-            </Box>
-          )}
-        </Paper>
-      )}
-
-      {/* Photos — lightbox-backed */}
-      {specimen.photos.length > 1 && (
-        <Paper withBorder p="md" mb="md">
-          <PublicPhotos
-            photos={specimen.photos.map((p) => ({ id: p.id, url: p.url, status: p.status }))}
-            specimenName={specimen.name}
-            mode="strip"
-          />
-        </Paper>
-      )}
-
-      {/* More from collector */}
-      {more.length > 0 && (
-        <Paper withBorder p="md">
-          <Group justify="space-between" align="center" mb={12}>
-            <Text style={EYEBROW}>more from @{specimen.ownerUsername}</Text>
-            <Text
-              component="a"
-              href={`/users/${specimen.ownerUsername}`}
-              size="xs" fw={600}
-              style={{ color: 'var(--mantine-primary-color-filled)', textDecoration: 'none' }}
-            >
-              View profile →
-            </Text>
-          </Group>
-          <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="xs">
-            {more.map((c) => (
-              <CoralStubCard key={c.id} c={c} />
-            ))}
-          </SimpleGrid>
-        </Paper>
-      )}
-    </Box>
+              </div>
+            )}
+          </aside>
+        </div>
+      </div>
+    </div>
   );
 }
