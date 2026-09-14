@@ -22,6 +22,21 @@ const EYEBROW: React.CSSProperties = {
   fontWeight: 500,
 };
 
+function OwnerLabel({ photo }: { photo: PendingPhoto }) {
+  if (photo.ownerUsername) {
+    return (
+      <Anchor component={Link} href={`/users/${photo.ownerUsername}`} size="xs" c="dimmed">
+        @{photo.ownerUsername}
+      </Anchor>
+    );
+  }
+  return (
+    <Text size="xs" c="dimmed">
+      Unclaimed frag{photo.parentOwnerUsername ? ` · cut by @${photo.parentOwnerUsername}` : ''}
+    </Text>
+  );
+}
+
 function PhotoCard({ photo, onDone }: { photo: PendingPhoto; onDone: (id: string) => void }) {
   const [, startTransition] = useTransition();
   const [rejectMode, setRejectMode] = useState(false);
@@ -58,9 +73,7 @@ function PhotoCard({ photo, onDone }: { photo: PendingPhoto; onDone: (id: string
       <Stack gap={6} p="sm">
         <Text size="sm" fw={700} truncate>{photo.coralName}</Text>
         <Group gap={4}>
-          <Anchor component={Link} href={`/users/${photo.ownerUsername}`} size="xs" c="dimmed">
-            @{photo.ownerUsername}
-          </Anchor>
+          <OwnerLabel photo={photo} />
           {photo.coralRfCode && <Text style={EYEBROW}>{photo.coralRfCode}</Text>}
         </Group>
         <Text size="xs" c="dimmed">
@@ -109,9 +122,7 @@ function HistoryRow({ photo }: { photo: ReviewedPhoto }) {
             </Badge>
           </Group>
           <Group gap={6}>
-            <Anchor component={Link} href={`/users/${photo.ownerUsername}`} size="xs" c="dimmed">
-              @{photo.ownerUsername}
-            </Anchor>
+            <OwnerLabel photo={photo} />
             {photo.coralRfCode && <Text style={EYEBROW}>{photo.coralRfCode}</Text>}
           </Group>
           {photo.reviewNote && (

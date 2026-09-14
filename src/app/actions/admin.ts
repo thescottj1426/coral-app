@@ -25,8 +25,11 @@ export type PendingPhoto = {
   coralId: string;
   coralName: string;
   coralRfCode: string | null;
-  ownerUsername: string;
+  // Null for an unclaimed frag, which has no owner until its code is claimed.
+  ownerUsername: string | null;
   ownerDisplayName: string | null;
+  // Who cut the frag, and so who photographed it.
+  parentOwnerUsername: string | null;
 };
 
 export async function getPendingPhotos(): Promise<PendingPhoto[]> {
@@ -35,10 +38,16 @@ export async function getPendingPhotos(): Promise<PendingPhoto[]> {
     `SELECT
        p.id, p."s3Key", p."createdAt",
        c.id AS "coralId", c.name AS "coralName", c."rfCode" AS "coralRfCode",
-       u.username AS "ownerUsername", u."displayName" AS "ownerDisplayName"
+       u.username AS "ownerUsername", u."displayName" AS "ownerDisplayName",
+       pu.username AS "parentOwnerUsername"
      FROM public."CoralPhoto" p
+     -- LEFT: a frag has no owner until claimed, and an inner join here hid
+     -- its photos from the queue entirely.
      JOIN public."Coral" c ON c.id = p."coralId"
-     JOIN public."User" u ON u.id = c."ownerId"
+     LEFT JOIN public."User" u ON u.id = c."ownerId"
+     LEFT JOIN public."Lineage" l ON l."childId" = c.id
+     LEFT JOIN public."Coral" par ON par.id = l."parentId"
+     LEFT JOIN public."User" pu ON pu.id = par."ownerId"
      WHERE p.status = 'pending'
      ORDER BY p."createdAt" ASC`
   );
@@ -92,10 +101,14 @@ export async function getPhotoHistory(limit = 100): Promise<ReviewedPhoto[]> {
        p.status, p."reviewedAt", p."reviewNote",
        c.id AS "coralId", c.name AS "coralName", c."rfCode" AS "coralRfCode",
        u.username AS "ownerUsername", u."displayName" AS "ownerDisplayName",
+       pu.username AS "parentOwnerUsername",
        r.username AS "reviewerUsername"
      FROM public."CoralPhoto" p
      JOIN public."Coral" c ON c.id = p."coralId"
-     JOIN public."User" u ON u.id = c."ownerId"
+     LEFT JOIN public."User" u ON u.id = c."ownerId"
+     LEFT JOIN public."Lineage" l ON l."childId" = c.id
+     LEFT JOIN public."Coral" par ON par.id = l."parentId"
+     LEFT JOIN public."User" pu ON pu.id = par."ownerId"
      LEFT JOIN public."User" r ON r.id = p."reviewedBy"
      WHERE p.status IN ('approved', 'rejected')
      ORDER BY p."reviewedAt" DESC

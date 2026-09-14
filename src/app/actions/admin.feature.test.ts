@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 import { testPool, truncateAll } from '@/test/db';
-import { seedUser, seedCoral, resetSequence } from '@/test/factories';
+import { seedUser, seedCoral, linkLineage, resetSequence } from '@/test/factories';
 
 const revalidatePath = vi.fn();
 vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidatePath(p) }));
@@ -18,7 +18,7 @@ const session = vi.fn();
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: () => session() } } }));
 vi.mock('next/headers', () => ({ headers: async () => new Headers() }));
 
-const { reviewPhoto } = await import('./admin');
+const { reviewPhoto, getPendingPhotos, getPhotoHistory } = await import('./admin');
 
 let admin: Awaited<ReturnType<typeof seedUser>>;
 
@@ -92,5 +92,50 @@ describe('reviewPhoto', () => {
     const { photoId } = await pendingPhoto('RF-REV7');
 
     await expect(reviewPhoto(photoId, 'approved')).rejects.toThrow(/Not authorized/);
+  });
+});
+
+describe('photo queue', () => {
+  // The queue inner-joined each photo to its coral's owner. An unclaimed frag
+  // has none, so its photos vanished and the page read "All clear" while they
+  // waited with no way to be approved.
+  async function unclaimedFragPhoto() {
+    const cutter = await seedUser({ id: 'cutter', username: 'cutter' });
+    const parent = await seedCoral({ ownerId: cutter.id, rfCode: 'RF-MOM1' });
+    const frag = await seedCoral({ ownerId: null, rfCode: 'RF-FRG1' });
+    await linkLineage(parent.id, frag.id);
+    const { rows } = await testPool.query<{ id: string }>(
+      `INSERT INTO public."CoralPhoto" (id, "s3Key", url, "coralId", status, "createdAt")
+       VALUES (gen_random_uuid()::text, 'frag-k', '/api/image?key=frag-k', $1, 'pending', NOW())
+       RETURNING id`,
+      [frag.id]
+    );
+    return rows[0].id;
+  }
+
+  it('includes a pending photo on an unclaimed frag', async () => {
+    const photoId = await unclaimedFragPhoto();
+    const pending = await getPendingPhotos();
+
+    expect(pending.map((p) => p.id)).toContain(photoId);
+    const row = pending.find((p) => p.id === photoId)!;
+    expect(row.ownerUsername).toBeNull();
+    expect(row.parentOwnerUsername).toBe('cutter');
+  });
+
+  it('keeps it in the history once reviewed', async () => {
+    const photoId = await unclaimedFragPhoto();
+    await reviewPhoto(photoId, 'approved');
+
+    expect((await getPendingPhotos()).map((p) => p.id)).not.toContain(photoId);
+    expect((await getPhotoHistory()).map((p) => p.id)).toContain(photoId);
+  });
+
+  it('still reports the owner for a claimed coral', async () => {
+    const { photoId } = await pendingPhoto('RF-OWN1');
+    const row = (await getPendingPhotos()).find((p) => p.id === photoId)!;
+
+    expect(row.ownerUsername).toBe(admin.username);
+    expect(row.parentOwnerUsername).toBeNull();
   });
 });
