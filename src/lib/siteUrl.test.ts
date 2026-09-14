@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { siteUrl } from './siteUrl';
 
-const FALLBACK = 'https://coral-app-one.vercel.app';
+const FALLBACK = 'https://www.coralchest.com';
 
 describe('siteUrl', () => {
   const original = process.env;

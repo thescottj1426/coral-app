@@ -2,7 +2,7 @@ import { betterAuth } from 'better-auth';
 import { Pool } from '@neondatabase/serverless';
 import { sendEmail } from './email';
 import { verifyTemplate, resetTemplate, welcomeTemplate } from './emailTemplates';
-import { authBaseUrl, googleConfigured } from './authUrl';
+import { authBaseUrl, googleConfigured, trustedOrigins } from './authUrl';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
@@ -17,10 +17,7 @@ export const auth = betterAuth({
   baseURL: authBaseUrl(),
   // Preview deployments each get their own origin; without this better-auth
   // rejects the callback before Google is ever reached.
-  trustedOrigins: [
-    authBaseUrl(),
-    ...(process.env.VERCEL_URL ? [`https://${process.env.VERCEL_URL}`] : []),
-  ],
+  trustedOrigins: trustedOrigins(),
   // Omitted entirely when unconfigured — registering with an empty clientId
   // yields a button that redirects to a Google error page and logs nothing.
   socialProviders: googleConfigured()

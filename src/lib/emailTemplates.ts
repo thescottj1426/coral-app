@@ -34,7 +34,7 @@ const FOOTER = `
   color: #868e96;
 `;
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://coral-app-one.vercel.app';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.coralchest.com';
 const APP_NAME = 'Coral Chest';
 
 function shell(title: string, body: string) {
