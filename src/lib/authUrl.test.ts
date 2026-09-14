@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { authBaseUrl, googleConfigured } from './authUrl';
+import { authBaseUrl, googleConfigured, trustedOrigins } from './authUrl';
 
-const PRODUCTION = 'https://coral-app-one.vercel.app';
+const PRODUCTION = 'https://www.coralchest.com';
 const LOCAL = 'http://localhost:3000';
 
 describe('authBaseUrl', () => {
@@ -106,5 +106,53 @@ describe('googleConfigured', () => {
 
   it('is false when neither is set', () => {
     expect(googleConfigured()).toBe(false);
+  });
+});
+
+describe('trustedOrigins', () => {
+  const original = process.env;
+
+  beforeEach(() => {
+    process.env = { ...original };
+    delete process.env.VERCEL;
+    delete process.env.VERCEL_ENV;
+    delete process.env.VERCEL_URL;
+    delete process.env.BETTER_AUTH_URL;
+  });
+
+  afterEach(() => {
+    process.env = original;
+  });
+
+  // The production outage: sign-in from coralchest.com returned 403 because
+  // only the Vercel domain was trusted.
+  it('trusts the custom domain, with and without www', () => {
+    process.env.VERCEL = '1';
+    process.env.VERCEL_ENV = 'production';
+    expect(trustedOrigins()).toEqual(
+      expect.arrayContaining(['https://www.coralchest.com', 'https://coralchest.com'])
+    );
+  });
+
+  it('still trusts the Vercel domain so old links keep working', () => {
+    process.env.VERCEL_ENV = 'production';
+    expect(trustedOrigins()).toContain('https://coral-app-one.vercel.app');
+  });
+
+  it('trusts the deployment url on a preview', () => {
+    process.env.VERCEL = '1';
+    process.env.VERCEL_ENV = 'preview';
+    process.env.VERCEL_URL = 'coral-abc123-scott.vercel.app';
+    expect(trustedOrigins()).toContain('https://coral-abc123-scott.vercel.app');
+  });
+
+  it('trusts localhost in development', () => {
+    expect(trustedOrigins()).toContain('http://localhost:3000');
+  });
+
+  it('lists each origin once', () => {
+    process.env.VERCEL_ENV = 'production';
+    const origins = trustedOrigins();
+    expect(new Set(origins).size).toBe(origins.length);
   });
 });

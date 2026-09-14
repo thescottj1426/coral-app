@@ -2,8 +2,10 @@
 
 import { createAuthClient } from 'better-auth/react';
 
-export const authClient = createAuthClient({
-  baseURL: process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000',
-});
+// No baseURL: the client talks to whatever origin served the page. A baked-in
+// URL is fixed at build time, so once the site moved to coralchest.com the
+// sign-in form kept posting to coral-app-one.vercel.app — cross-origin, and
+// blocked by the browser before better-auth ever saw it.
+export const authClient = createAuthClient();
 
 export const { signIn, signUp, signOut, useSession } = authClient;

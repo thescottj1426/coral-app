@@ -11,7 +11,16 @@
  * that into Vercel — the same way the sitemap once shipped localhost URLs —
  * and production asks Google to redirect to localhost, which Google refuses.
  */
-const PRODUCTION_URL = 'https://coral-app-one.vercel.app';
+const PRODUCTION_URL = 'https://www.coralchest.com';
+
+// Every origin a real user can sign in from. The Vercel domain stays trusted so
+// bookmarks and old links keep working after the move to coralchest.com; the
+// apex redirects to www, but a request can still arrive before the redirect.
+const PRODUCTION_ORIGINS = [
+  'https://www.coralchest.com',
+  'https://coralchest.com',
+  'https://coral-app-one.vercel.app',
+];
 const LOCAL_URL = 'http://localhost:3000';
 
 function isLocal(url: string) {
@@ -34,6 +43,19 @@ export function authBaseUrl(): string {
   if (configured && !(process.env.VERCEL && isLocal(configured))) return strip(configured);
 
   return LOCAL_URL;
+}
+
+/**
+ * better-auth rejects any request whose Origin is not listed here with a 403 —
+ * including a request from the site's own domain. When production was
+ * hardcoded to the Vercel domain, sign-in from coralchest.com failed this check
+ * even once the browser stopped blocking it.
+ */
+export function trustedOrigins(): string[] {
+  const origins = new Set([authBaseUrl(), ...PRODUCTION_ORIGINS]);
+  const vercelUrl = process.env.VERCEL_URL?.trim();
+  if (vercelUrl) origins.add(`https://${strip(vercelUrl)}`);
+  return [...origins];
 }
 
 /**

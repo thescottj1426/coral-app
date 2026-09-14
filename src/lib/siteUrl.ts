@@ -7,7 +7,7 @@
  * URLs to Google. So a localhost value is ignored whenever we're on Vercel,
  * where VERCEL_PROJECT_PRODUCTION_URL is the stable production domain.
  */
-const FALLBACK = 'https://coral-app-one.vercel.app';
+const FALLBACK = 'https://www.coralchest.com';
 
 function isLocal(url: string) {
   return /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)/i.test(url);
