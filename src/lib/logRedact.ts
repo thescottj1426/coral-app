@@ -22,6 +22,46 @@ const SENSITIVE_KEYS = [
   'sessionToken',
 ];
 
+function isSensitiveKey(key: string): boolean {
+  const lower = key.toLowerCase();
+  return SENSITIVE_KEYS.some((s) => lower.includes(s.toLowerCase()));
+}
+
+const MAX_STRING = 120;
+
+/**
+ * What a failed call was given, safe to attach to a Sentry event: IDs, codes,
+ * enums and numbers survive; secrets and emails do not; long text is cut.
+ * Flat string/number/boolean values only, because Sentry log attributes accept
+ * nothing else.
+ */
+export function summarizeInput(input: Record<string, unknown>): Record<string, string | number | boolean> {
+  const out: Record<string, string | number | boolean> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (value === undefined) continue;
+    if (isSensitiveKey(key)) {
+      out[key] = '[REDACTED]';
+    } else if (value === null) {
+      out[key] = 'null';
+    } else if (typeof value === 'number' || typeof value === 'boolean') {
+      out[key] = value;
+    } else if (typeof value === 'string') {
+      out[key] = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value)
+        ? maskEmail(value)
+        : value.length > MAX_STRING
+          ? `${value.slice(0, MAX_STRING)}… (${value.length} chars)`
+          : value;
+    } else if (typeof Blob !== 'undefined' && value instanceof Blob) {
+      out[key] = `[file ${value.size} bytes]`;
+    } else if (Array.isArray(value)) {
+      out[key] = `[array of ${value.length}]`;
+    } else {
+      out[key] = `[object: ${Object.keys(value as object).join(', ').slice(0, MAX_STRING)}]`;
+    }
+  }
+  return out;
+}
+
 type SentryLog = {
   level: string;
   message?: string;

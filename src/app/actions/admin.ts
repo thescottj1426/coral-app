@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { auth } from '@/lib/auth';
 import { pool, queryOne } from '@/lib/db';
 import { imageProxyUrl } from '@/lib/s3';
+import { trackAction } from '@/lib/log';
 
 async function getCurrentAdmin() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -33,25 +34,27 @@ export type PendingPhoto = {
 };
 
 export async function getPendingPhotos(): Promise<PendingPhoto[]> {
-  await getCurrentAdmin();
-  const { rows } = await pool.query<PendingPhoto>(
-    `SELECT
-       p.id, p."s3Key", p."createdAt",
-       c.id AS "coralId", c.name AS "coralName", c."rfCode" AS "coralRfCode",
-       u.username AS "ownerUsername", u."displayName" AS "ownerDisplayName",
-       pu.username AS "parentOwnerUsername"
-     FROM public."CoralPhoto" p
-     -- LEFT: a frag has no owner until claimed, and an inner join here hid
-     -- its photos from the queue entirely.
-     JOIN public."Coral" c ON c.id = p."coralId"
-     LEFT JOIN public."User" u ON u.id = c."ownerId"
-     LEFT JOIN public."Lineage" l ON l."childId" = c.id
-     LEFT JOIN public."Coral" par ON par.id = l."parentId"
-     LEFT JOIN public."User" pu ON pu.id = par."ownerId"
-     WHERE p.status = 'pending'
-     ORDER BY p."createdAt" ASC`
-  );
-  return rows.map((r) => ({ ...r, url: imageProxyUrl(r.s3Key) }));
+  return trackAction('getPendingPhotos', {}, async () => {
+    await getCurrentAdmin();
+    const { rows } = await pool.query<PendingPhoto>(
+      `SELECT
+         p.id, p."s3Key", p."createdAt",
+         c.id AS "coralId", c.name AS "coralName", c."rfCode" AS "coralRfCode",
+         u.username AS "ownerUsername", u."displayName" AS "ownerDisplayName",
+         pu.username AS "parentOwnerUsername"
+       FROM public."CoralPhoto" p
+       -- LEFT: a frag has no owner until claimed, and an inner join here hid
+       -- its photos from the queue entirely.
+       JOIN public."Coral" c ON c.id = p."coralId"
+       LEFT JOIN public."User" u ON u.id = c."ownerId"
+       LEFT JOIN public."Lineage" l ON l."childId" = c.id
+       LEFT JOIN public."Coral" par ON par.id = l."parentId"
+       LEFT JOIN public."User" pu ON pu.id = par."ownerId"
+       WHERE p.status = 'pending'
+       ORDER BY p."createdAt" ASC`
+    );
+    return rows.map((r) => ({ ...r, url: imageProxyUrl(r.s3Key) }));
+  });
 }
 
 export async function reviewPhoto(
@@ -59,31 +62,33 @@ export async function reviewPhoto(
   decision: 'approved' | 'rejected',
   note?: string
 ): Promise<void> {
-  const admin = await getCurrentAdmin();
+  return trackAction('reviewPhoto', { photoId, decision, note }, async () => {
+    const admin = await getCurrentAdmin();
 
-  // Needed to refresh the coral's own page, which is still ISR-cached.
-  const { rows } = await pool.query<{ rfCode: string | null }>(
-    `SELECT c."rfCode"
-     FROM public."CoralPhoto" p
-     JOIN public."Coral" c ON c.id = p."coralId"
-     WHERE p.id = $1`,
-    [photoId]
-  );
+    // Needed to refresh the coral's own page, which is still ISR-cached.
+    const { rows } = await pool.query<{ rfCode: string | null }>(
+      `SELECT c."rfCode"
+       FROM public."CoralPhoto" p
+       JOIN public."Coral" c ON c.id = p."coralId"
+       WHERE p.id = $1`,
+      [photoId]
+    );
 
-  await pool.query(
-    `UPDATE public."CoralPhoto"
-     SET status = $1::"PhotoStatus", "reviewedBy" = $2, "reviewedAt" = NOW(), "reviewNote" = $3
-     WHERE id = $4`,
-    [decision, admin.id, note ?? null, photoId]
-  );
+    await pool.query(
+      `UPDATE public."CoralPhoto"
+       SET status = $1::"PhotoStatus", "reviewedBy" = $2, "reviewedAt" = NOW(), "reviewNote" = $3
+       WHERE id = $4`,
+      [decision, admin.id, note ?? null, photoId]
+    );
 
-  revalidatePath('/admin/photos');
+    revalidatePath('/admin/photos');
 
-  // The home page is force-dynamic, so it needs nothing. /explore and the
-  // coral's public page still cache for 60s, and a reviewer who just approved
-  // a photo will look at the coral immediately.
-  revalidatePath('/explore');
-  if (rows[0]?.rfCode) revalidatePath(`/coral/${rows[0].rfCode}`);
+    // The home page is force-dynamic, so it needs nothing. /explore and the
+    // coral's public page still cache for 60s, and a reviewer who just approved
+    // a photo will look at the coral immediately.
+    revalidatePath('/explore');
+    if (rows[0]?.rfCode) revalidatePath(`/coral/${rows[0].rfCode}`);
+  });
 }
 
 export type ReviewedPhoto = PendingPhoto & {
@@ -94,28 +99,30 @@ export type ReviewedPhoto = PendingPhoto & {
 };
 
 export async function getPhotoHistory(limit = 100): Promise<ReviewedPhoto[]> {
-  await getCurrentAdmin();
-  const { rows } = await pool.query<ReviewedPhoto>(
-    `SELECT
-       p.id, p."s3Key", p."createdAt",
-       p.status, p."reviewedAt", p."reviewNote",
-       c.id AS "coralId", c.name AS "coralName", c."rfCode" AS "coralRfCode",
-       u.username AS "ownerUsername", u."displayName" AS "ownerDisplayName",
-       pu.username AS "parentOwnerUsername",
-       r.username AS "reviewerUsername"
-     FROM public."CoralPhoto" p
-     JOIN public."Coral" c ON c.id = p."coralId"
-     LEFT JOIN public."User" u ON u.id = c."ownerId"
-     LEFT JOIN public."Lineage" l ON l."childId" = c.id
-     LEFT JOIN public."Coral" par ON par.id = l."parentId"
-     LEFT JOIN public."User" pu ON pu.id = par."ownerId"
-     LEFT JOIN public."User" r ON r.id = p."reviewedBy"
-     WHERE p.status IN ('approved', 'rejected')
-     ORDER BY p."reviewedAt" DESC
-     LIMIT $1`,
-    [limit]
-  );
-  return rows.map((r) => ({ ...r, url: imageProxyUrl(r.s3Key) }));
+  return trackAction('getPhotoHistory', { limit }, async () => {
+    await getCurrentAdmin();
+    const { rows } = await pool.query<ReviewedPhoto>(
+      `SELECT
+         p.id, p."s3Key", p."createdAt",
+         p.status, p."reviewedAt", p."reviewNote",
+         c.id AS "coralId", c.name AS "coralName", c."rfCode" AS "coralRfCode",
+         u.username AS "ownerUsername", u."displayName" AS "ownerDisplayName",
+         pu.username AS "parentOwnerUsername",
+         r.username AS "reviewerUsername"
+       FROM public."CoralPhoto" p
+       JOIN public."Coral" c ON c.id = p."coralId"
+       LEFT JOIN public."User" u ON u.id = c."ownerId"
+       LEFT JOIN public."Lineage" l ON l."childId" = c.id
+       LEFT JOIN public."Coral" par ON par.id = l."parentId"
+       LEFT JOIN public."User" pu ON pu.id = par."ownerId"
+       LEFT JOIN public."User" r ON r.id = p."reviewedBy"
+       WHERE p.status IN ('approved', 'rejected')
+       ORDER BY p."reviewedAt" DESC
+       LIMIT $1`,
+      [limit]
+    );
+    return rows.map((r) => ({ ...r, url: imageProxyUrl(r.s3Key) }));
+  });
 }
 
 export type OpenReport = {
@@ -129,26 +136,28 @@ export type OpenReport = {
 };
 
 export async function getOpenReports(): Promise<OpenReport[]> {
-  // Every other export here gates on this; this one did not. It returns
-  // reporterUsername alongside the reason, so an unguarded read hands the
-  // reported person the name of whoever reported them.
-  await getCurrentAdmin();
-  const { rows } = await pool.query<OpenReport>(
-    `SELECT
-       r.id, r."targetType", r."targetId", r.reason, r."createdAt",
-       u.username AS "reporterUsername",
-       CASE
-         WHEN r."targetType" = 'coral'  THEN (SELECT name FROM public."Coral"        WHERE id = r."targetId")
-         WHEN r."targetType" = 'user'   THEN (SELECT username FROM public."User"      WHERE id = r."targetId")
-         WHEN r."targetType" = 'thread' THEN (SELECT title FROM public."Thread"       WHERE id = r."targetId")
-         WHEN r."targetType" = 'reply'  THEN (SELECT LEFT(body, 80) FROM public."ThreadReply" WHERE id = r."targetId")
-       END AS "targetPreview"
-     FROM public."Report" r
-     LEFT JOIN public."User" u ON u.id = r."reporterId"
-     WHERE r.status = 'open'
-     ORDER BY r."createdAt" ASC`
-  );
-  return rows;
+  return trackAction('getOpenReports', {}, async () => {
+    // Every other export here gates on this; this one did not. It returns
+    // reporterUsername alongside the reason, so an unguarded read hands the
+    // reported person the name of whoever reported them.
+    await getCurrentAdmin();
+    const { rows } = await pool.query<OpenReport>(
+      `SELECT
+         r.id, r."targetType", r."targetId", r.reason, r."createdAt",
+         u.username AS "reporterUsername",
+         CASE
+           WHEN r."targetType" = 'coral'  THEN (SELECT name FROM public."Coral"        WHERE id = r."targetId")
+           WHEN r."targetType" = 'user'   THEN (SELECT username FROM public."User"      WHERE id = r."targetId")
+           WHEN r."targetType" = 'thread' THEN (SELECT title FROM public."Thread"       WHERE id = r."targetId")
+           WHEN r."targetType" = 'reply'  THEN (SELECT LEFT(body, 80) FROM public."ThreadReply" WHERE id = r."targetId")
+         END AS "targetPreview"
+       FROM public."Report" r
+       LEFT JOIN public."User" u ON u.id = r."reporterId"
+       WHERE r.status = 'open'
+       ORDER BY r."createdAt" ASC`
+    );
+    return rows;
+  });
 }
 
 export async function resolveReport(
@@ -156,14 +165,16 @@ export async function resolveReport(
   decision: 'resolved' | 'dismissed',
   note?: string
 ): Promise<void> {
-  const admin = await getCurrentAdmin();
-  await pool.query(
-    `UPDATE public."Report"
-     SET status = $1::"ReportStatus", "resolvedBy" = $2, "resolvedAt" = NOW(), "adminNote" = $3
-     WHERE id = $4`,
-    [decision, admin.id, note ?? null, reportId]
-  );
-  revalidatePath('/admin/reports');
+  return trackAction('resolveReport', { reportId, decision, note }, async () => {
+    const admin = await getCurrentAdmin();
+    await pool.query(
+      `UPDATE public."Report"
+       SET status = $1::"ReportStatus", "resolvedBy" = $2, "resolvedAt" = NOW(), "adminNote" = $3
+       WHERE id = $4`,
+      [decision, admin.id, note ?? null, reportId]
+    );
+    revalidatePath('/admin/reports');
+  });
 }
 
 export type AdminStats = {
@@ -174,24 +185,26 @@ export type AdminStats = {
 };
 
 export async function getAdminStats(): Promise<AdminStats> {
-  await getCurrentAdmin();
-  const { rows } = await pool.query<{
-    pendingPhotos: string;
-    openReports: string;
-    totalUsers: string;
-    totalCorals: string;
-  }>(
-    `SELECT
-       (SELECT COUNT(*) FROM public."CoralPhoto" WHERE status = 'pending')::text AS "pendingPhotos",
-       (SELECT COUNT(*) FROM public."Report"     WHERE status = 'open')::text    AS "openReports",
-       (SELECT COUNT(*) FROM public."User")::text                                AS "totalUsers",
-       (SELECT COUNT(*) FROM public."Coral")::text                               AS "totalCorals"`
-  );
-  const r = rows[0];
-  return {
-    pendingPhotos: parseInt(r.pendingPhotos, 10),
-    openReports: parseInt(r.openReports, 10),
-    totalUsers: parseInt(r.totalUsers, 10),
-    totalCorals: parseInt(r.totalCorals, 10),
-  };
+  return trackAction('getAdminStats', {}, async () => {
+    await getCurrentAdmin();
+    const { rows } = await pool.query<{
+      pendingPhotos: string;
+      openReports: string;
+      totalUsers: string;
+      totalCorals: string;
+    }>(
+      `SELECT
+         (SELECT COUNT(*) FROM public."CoralPhoto" WHERE status = 'pending')::text AS "pendingPhotos",
+         (SELECT COUNT(*) FROM public."Report"     WHERE status = 'open')::text    AS "openReports",
+         (SELECT COUNT(*) FROM public."User")::text                                AS "totalUsers",
+         (SELECT COUNT(*) FROM public."Coral")::text                               AS "totalCorals"`
+    );
+    const r = rows[0];
+    return {
+      pendingPhotos: parseInt(r.pendingPhotos, 10),
+      openReports: parseInt(r.openReports, 10),
+      totalUsers: parseInt(r.totalUsers, 10),
+      totalCorals: parseInt(r.totalCorals, 10),
+    };
+  });
 }

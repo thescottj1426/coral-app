@@ -3,10 +3,10 @@ import { scrubLog } from '@/lib/logRedact';
 
 Sentry.init({
   dsn:
-    process.env.NEXT_PUBLIC_SENTRY_DSN ??
+    process.env.NEXT_PUBLIC_SENTRY_DSN ||
     'https://4fb3e5f9978beb18f27e26a43daf66c8@o4512023905370112.ingest.us.sentry.io/4512023916904448',
 
-  environment: process.env.NODE_ENV,
+  environment: process.env.NEXT_PUBLIC_VERCEL_ENV ?? 'development',
 
   tracesSampleRate: process.env.NODE_ENV === 'development' ? 1.0 : 0.1,
 

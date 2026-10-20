@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { s3, S3_BUCKET } from '@/lib/s3';
 import { auth } from '@/lib/auth';
 import { resolvePhotoAccess } from '@/lib/photoAccess';
+import { withRoute } from '@/lib/log';
 
-export async function GET(request: NextRequest) {
+export const GET = withRoute('api.image', handleGet);
+
+async function handleGet(request: NextRequest) {
   const key = request.nextUrl.searchParams.get('key');
   if (!key) return new NextResponse('Missing key', { status: 400 });
 
@@ -44,7 +48,9 @@ export async function GET(request: NextRequest) {
         'Cache-Control': 'private, no-store',
       },
     });
-  } catch {
+  } catch (err) {
+    // A photo row exists but S3 could not return it — not a normal 404.
+    Sentry.captureException(err, { tags: { api: 'image' }, extra: { key } });
     return new NextResponse('Not found', { status: 404 });
   }
 }

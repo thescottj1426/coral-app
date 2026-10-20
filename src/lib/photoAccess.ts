@@ -22,15 +22,17 @@ export async function resolvePhotoAccess(
     status: string;
     ownerId: string | null;
     parentOwnerId: string | null;
+    viewerIsAdmin: boolean | null;
   }>(
-    `SELECT ph.status, c."ownerId", par."ownerId" AS "parentOwnerId"
+    `SELECT ph.status, c."ownerId", par."ownerId" AS "parentOwnerId",
+            (SELECT "isAdmin" FROM public."User" WHERE id = $2) AS "viewerIsAdmin"
        FROM public."CoralPhoto" ph
        JOIN public."Coral" c ON c.id = ph."coralId"
        LEFT JOIN public."Lineage" l ON l."childId" = c.id
        LEFT JOIN public."Coral" par ON par.id = l."parentId"
       WHERE ph."s3Key" = $1
       LIMIT 1`,
-    [s3Key]
+    [s3Key, viewerId]
   );
 
   const row = rows[0];
@@ -43,6 +45,9 @@ export async function resolvePhotoAccess(
   if (row.status !== 'pending') return { ok: false };
 
   if (!viewerId) return { ok: false };
+
+  // The reviewer has to be able to see what they are approving.
+  if (row.viewerIsAdmin) return { ok: true, status: 'pending' };
 
   const ownsIt = row.ownerId === viewerId;
   // The permission lapses on claim, exactly as it does for writing: once the

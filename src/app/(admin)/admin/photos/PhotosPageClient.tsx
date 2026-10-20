@@ -68,7 +68,9 @@ function PhotoCard({ photo, onDone }: { photo: PendingPhoto; onDone: (id: string
   return (
     <Paper withBorder radius="md" className={`${styles.photoCard} ${fading ? styles.fadingOut : ''}`}>
       <Box style={{ position: 'relative', aspectRatio: '1' }}>
-        <Image src={photo.url} alt={photo.coralName} fill style={{ objectFit: 'cover' }} sizes="25vw" />
+        {/* unoptimized: the optimizer fetches without the admin's cookies, and
+            /api/image only serves a pending photo to a signed-in reviewer. */}
+        <Image src={photo.url} alt={photo.coralName} fill unoptimized style={{ objectFit: 'cover' }} sizes="25vw" />
       </Box>
       <Stack gap={6} p="sm">
         <Text size="sm" fw={700} truncate>{photo.coralName}</Text>

@@ -3,9 +3,14 @@
 import { pool } from '@/lib/db';
 import { getCurrentUser } from '@/lib/getCurrentUser';
 
+// Import the type from '@/lib/notifications', never re-export it from here. In a
+// 'use server' file, `export type { NotificationType }` survives into the
+// server-action bundle as a runtime export of an erased name, and the module
+// throws "NotificationType is not defined" when loaded — which crashed every
+// server action on any page whose header renders the notification bell,
+// including approving and rejecting photos in /admin.
 import type { NotificationType } from '@/lib/notifications';
-export type { NotificationType };
-
+import { trackAction } from '@/lib/log';
 
 export type NotificationRow = {
   id: string;
@@ -20,33 +25,39 @@ export type NotificationRow = {
 
 
 export async function getUnreadCount(): Promise<number> {
-  const user = await getCurrentUser();
-  const { rows } = await pool.query<{ count: string }>(
-    `SELECT COUNT(*)::text AS count FROM public."Notification" WHERE "userId" = $1 AND read = false`,
-    [user.id]
-  );
-  return parseInt(rows[0].count, 10);
+  return trackAction('getUnreadCount', {}, async () => {
+    const user = await getCurrentUser();
+    const { rows } = await pool.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM public."Notification" WHERE "userId" = $1 AND read = false`,
+      [user.id]
+    );
+    return parseInt(rows[0].count, 10);
+  });
 }
 
 export async function getMyNotifications(limit = 20): Promise<NotificationRow[]> {
-  const user = await getCurrentUser();
-  const { rows } = await pool.query<NotificationRow>(
-    `SELECT n.id, n.type, n."fromUserId", u.username AS "fromUsername",
-            n."targetType", n."targetId", n.read, n."createdAt"
-     FROM public."Notification" n
-     LEFT JOIN public."User" u ON u.id = n."fromUserId"
-     WHERE n."userId" = $1
-     ORDER BY n."createdAt" DESC
-     LIMIT $2`,
-    [user.id, limit]
-  );
-  return rows;
+  return trackAction('getMyNotifications', { limit }, async () => {
+    const user = await getCurrentUser();
+    const { rows } = await pool.query<NotificationRow>(
+      `SELECT n.id, n.type, n."fromUserId", u.username AS "fromUsername",
+              n."targetType", n."targetId", n.read, n."createdAt"
+       FROM public."Notification" n
+       LEFT JOIN public."User" u ON u.id = n."fromUserId"
+       WHERE n."userId" = $1
+       ORDER BY n."createdAt" DESC
+       LIMIT $2`,
+      [user.id, limit]
+    );
+    return rows;
+  });
 }
 
 export async function markAllRead(): Promise<void> {
-  const user = await getCurrentUser();
-  await pool.query(
-    `UPDATE public."Notification" SET read = true WHERE "userId" = $1 AND read = false`,
-    [user.id]
-  );
+  return trackAction('markAllRead', {}, async () => {
+    const user = await getCurrentUser();
+    await pool.query(
+      `UPDATE public."Notification" SET read = true WHERE "userId" = $1 AND read = false`,
+      [user.id]
+    );
+  });
 }
