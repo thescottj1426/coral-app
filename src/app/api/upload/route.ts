@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { auth } from '@/lib/auth';
 import { s3, S3_BUCKET, imageProxyUrl } from '@/lib/s3';
 import { addSpecimenPhoto } from '@/app/actions/specimens';
+import { withRoute } from '@/lib/log';
 
-export async function POST(request: NextRequest) {
+export const POST = withRoute('api.upload', handlePost);
+
+async function handlePost(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -51,6 +55,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ url: photo.url, key, photo });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not attach the photo';
+      // A refused permission is expected; anything else is a real failure.
+      if (message !== 'Not authorized') {
+        Sentry.captureException(err, { tags: { api: 'upload' }, extra: { specimenId, key } });
+      }
       return NextResponse.json({ error: message }, { status: message === 'Not authorized' ? 403 : 400 });
     }
   }

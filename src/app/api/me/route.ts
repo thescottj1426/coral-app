@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/getCurrentUser';
 import { queryOne } from '@/lib/db';
+import { withRoute } from '@/lib/log';
 
-export async function GET() {
+export const GET = withRoute('api.me', handleGet);
+
+async function handleGet() {
   // getCurrentUser resolves the app User.id by email — matching on
   // session.user.id directly returns nothing for accounts migrated from the
   // old auth system, which is the bug this used to have.

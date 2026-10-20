@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { auth } from './auth';
 import { pool } from './db';
 import { FREE_CAP_ENABLED_AT, type Plan } from './entitlements';
+import * as Sentry from '@sentry/nextjs';
 import { invariant, maskEmail } from './log';
 
 type UserRow = { id: string; plan: Plan; capExempt: boolean };
@@ -26,6 +27,8 @@ export async function getCurrentUser() {
   const { rows } = await pool.query<UserRow>(SELECT_USER, [session.user.email, FREE_CAP_ENABLED_AT]);
 
   if (rows.length > 0) {
+    // Id only — the email stays out of Sentry.
+    Sentry.setUser({ id: rows[0].id });
     return { ...session.user, ...rows[0] };
   }
 

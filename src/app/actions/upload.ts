@@ -5,22 +5,25 @@ import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { auth } from '@/lib/auth';
 import { s3, S3_BUCKET, imageProxyUrl } from '@/lib/s3';
+import { trackAction } from '@/lib/log';
 
 export async function getUploadUrl(
   contentType: string,
   ext: string
 ): Promise<{ uploadUrl: string; publicUrl: string; key: string }> {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user) throw new Error('Not authenticated');
+  return trackAction('getUploadUrl', { contentType, ext }, async () => {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session?.user) throw new Error('Not authenticated');
 
-  const key = `specimens/${session.user.id}/${crypto.randomUUID()}.${ext}`;
+    const key = `specimens/${session.user.id}/${crypto.randomUUID()}.${ext}`;
 
-  const command = new PutObjectCommand({
-    Bucket: S3_BUCKET,
-    Key: key,
-    ContentType: contentType,
+    const command = new PutObjectCommand({
+      Bucket: S3_BUCKET,
+      Key: key,
+      ContentType: contentType,
+    });
+
+    const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
+    return { uploadUrl, publicUrl: imageProxyUrl(key), key };
   });
-
-  const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
-  return { uploadUrl, publicUrl: imageProxyUrl(key), key };
 }

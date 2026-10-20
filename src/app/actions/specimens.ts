@@ -8,7 +8,7 @@ import { sendEmail } from '@/lib/email';
 import { welcomeTemplate } from '@/lib/emailTemplates';
 import { uniqueRFCode } from '@/lib/rfCode';
 import { checkSpecimenCap } from '@/lib/entitlements';
-import { invariant } from '@/lib/log';
+import { invariant, trackAction } from '@/lib/log';
 
 export type CoralStage =
   | 'MOTHER_COLONY' | 'COLONY' | 'MINI_COLONY' | 'FRAG' | 'MICRO_FRAG';
@@ -45,25 +45,27 @@ export type SpecimenRow = {
 // a parameter is something any caller can supply — and these rows carry notes,
 // vendor and givenTo, none of which appear on a public profile.
 export async function getMySpecimens(): Promise<SpecimenRow[]> {
-  const user = await getCurrentUser();
-  const { rows } = await pool.query<Omit<SpecimenRow, 'coverPhotoUrl'> & { coverKey: string | null }>(
-    `SELECT
-       c.id, c.name, c.species, c.category, c."rfCode", c.origin, c.notes,
-       c."identityHue", c."acquiredDate", c."createdAt", c."updatedAt",
-       c."tankName", c."lightPar", c."flowLevel",
-       c."stage", c."acquiredStage", c."generationFromMother", c."sourceColony", c."vendor",
-       c.status, c."statusAt", c."statusNote", c."givenTo",
-       (SELECT p."s3Key" FROM public."CoralPhoto" p WHERE p."coralId" = c.id ORDER BY CASE WHEN p.status = 'approved' THEN 0 ELSE 1 END, p."createdAt" ASC LIMIT 1) AS "coverKey",
-       (SELECT p.status = 'pending' FROM public."CoralPhoto" p WHERE p."coralId" = c.id ORDER BY CASE WHEN p.status = 'approved' THEN 0 ELSE 1 END, p."createdAt" ASC LIMIT 1) AS "coverPhotoPending"
-     FROM public."Coral" c
-     WHERE c."ownerId" = $1
-     ORDER BY c."createdAt" DESC`,
-    [user.id]
-  );
-  return rows.map(({ coverKey, ...r }) => ({
-    ...r,
-    coverPhotoUrl: coverKey ? imageProxyUrl(coverKey) : null,
-  }));
+  return trackAction('getMySpecimens', {}, async () => {
+    const user = await getCurrentUser();
+    const { rows } = await pool.query<Omit<SpecimenRow, 'coverPhotoUrl'> & { coverKey: string | null }>(
+      `SELECT
+         c.id, c.name, c.species, c.category, c."rfCode", c.origin, c.notes,
+         c."identityHue", c."acquiredDate", c."createdAt", c."updatedAt",
+         c."tankName", c."lightPar", c."flowLevel",
+         c."stage", c."acquiredStage", c."generationFromMother", c."sourceColony", c."vendor",
+         c.status, c."statusAt", c."statusNote", c."givenTo",
+         (SELECT p."s3Key" FROM public."CoralPhoto" p WHERE p."coralId" = c.id ORDER BY CASE WHEN p.status = 'approved' THEN 0 ELSE 1 END, p."createdAt" ASC LIMIT 1) AS "coverKey",
+         (SELECT p.status = 'pending' FROM public."CoralPhoto" p WHERE p."coralId" = c.id ORDER BY CASE WHEN p.status = 'approved' THEN 0 ELSE 1 END, p."createdAt" ASC LIMIT 1) AS "coverPhotoPending"
+       FROM public."Coral" c
+       WHERE c."ownerId" = $1
+       ORDER BY c."createdAt" DESC`,
+      [user.id]
+    );
+    return rows.map(({ coverKey, ...r }) => ({
+      ...r,
+      coverPhotoUrl: coverKey ? imageProxyUrl(coverKey) : null,
+    }));
+  });
 }
 
 export async function createSpecimen(data: {
@@ -85,79 +87,81 @@ export async function createSpecimen(data: {
   photoUrl?: string;
   photoKey?: string;
 }): Promise<SpecimenRow | { error: string }> {
-  const user = await getCurrentUser();
+  return trackAction('createSpecimen', { ...data }, async () => {
+    const user = await getCurrentUser();
 
-  const cap = await checkSpecimenCap(user);
-  if (!cap.ok) return { error: cap.error };
+    const cap = await checkSpecimenCap(user);
+    if (!cap.ok) return { error: cap.error };
 
-  const rfCode = await uniqueRFCode();
-  const identityHue = Math.floor(Math.random() * 360);
+    const rfCode = await uniqueRFCode();
+    const identityHue = Math.floor(Math.random() * 360);
 
-  const { rows } = await pool.query<SpecimenRow>(
-    `INSERT INTO public."Coral"
-       (id, name, species, category, origin, notes, "tankName", "lightPar", "flowLevel",
-        stage, "acquiredStage", "generationFromMother", "sourceColony", vendor,
-        "rfCode", "ownerId", "identityHue", "updatedAt")
-     VALUES
-       (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8,
-        $9::"CoralStage", $10::"CoralStage", $11, $12, $13,
-        $14, $15, $16, NOW())
-     RETURNING id, name, species, category, "rfCode", origin, notes, "tankName", "lightPar", "flowLevel",
-               stage, "acquiredStage", "generationFromMother", "sourceColony", vendor,
-               "identityHue", "acquiredDate", "createdAt", "updatedAt"`,
-    [
-      data.name, data.species ?? null, data.category, data.origin ?? null, data.notes ?? null,
-      data.tankName ?? null, data.lightPar ?? null, data.flowLevel ?? null,
-      data.stage ?? null, data.acquiredStage ?? data.stage ?? null,
-      data.generationFromMother ?? null, data.sourceColony ?? null, data.vendor ?? null,
-      rfCode, user.id, identityHue,
-    ]
-  );
-
-  const specimen = rows[0];
-
-  // Linking to a coral the user already owns. Snapshot the parent's stage at
-  // cut time so the claim stays truthful after the parent grows and is edited.
-  if (data.parentId) {
-    const { rows: parentRows } = await pool.query<{ id: string; stage: CoralStage | null }>(
-      'SELECT id, stage FROM public."Coral" WHERE id = $1 AND "ownerId" = $2',
-      [data.parentId, user.id]
+    const { rows } = await pool.query<SpecimenRow>(
+      `INSERT INTO public."Coral"
+         (id, name, species, category, origin, notes, "tankName", "lightPar", "flowLevel",
+          stage, "acquiredStage", "generationFromMother", "sourceColony", vendor,
+          "rfCode", "ownerId", "identityHue", "updatedAt")
+       VALUES
+         (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8,
+          $9::"CoralStage", $10::"CoralStage", $11, $12, $13,
+          $14, $15, $16, NOW())
+       RETURNING id, name, species, category, "rfCode", origin, notes, "tankName", "lightPar", "flowLevel",
+                 stage, "acquiredStage", "generationFromMother", "sourceColony", vendor,
+                 "identityHue", "acquiredDate", "createdAt", "updatedAt"`,
+      [
+        data.name, data.species ?? null, data.category, data.origin ?? null, data.notes ?? null,
+        data.tankName ?? null, data.lightPar ?? null, data.flowLevel ?? null,
+        data.stage ?? null, data.acquiredStage ?? data.stage ?? null,
+        data.generationFromMother ?? null, data.sourceColony ?? null, data.vendor ?? null,
+        rfCode, user.id, identityHue,
+      ]
     );
-    if (parentRows[0]) {
-      await pool.query(
-        `INSERT INTO public."Lineage" ("parentId", "childId", "parentStageAtCut")
-         VALUES ($1, $2, $3::"CoralStage") ON CONFLICT DO NOTHING`,
-        [parentRows[0].id, specimen.id, parentRows[0].stage]
+
+    const specimen = rows[0];
+
+    // Linking to a coral the user already owns. Snapshot the parent's stage at
+    // cut time so the claim stays truthful after the parent grows and is edited.
+    if (data.parentId) {
+      const { rows: parentRows } = await pool.query<{ id: string; stage: CoralStage | null }>(
+        'SELECT id, stage FROM public."Coral" WHERE id = $1 AND "ownerId" = $2',
+        [data.parentId, user.id]
       );
-    } else {
-      invariant('specimen.parent_not_owned_by_creator', false, {
-        parentId: data.parentId,
-        specimenId: specimen.id,
-      });
+      if (parentRows[0]) {
+        await pool.query(
+          `INSERT INTO public."Lineage" ("parentId", "childId", "parentStageAtCut")
+           VALUES ($1, $2, $3::"CoralStage") ON CONFLICT DO NOTHING`,
+          [parentRows[0].id, specimen.id, parentRows[0].stage]
+        );
+      } else {
+        invariant('specimen.parent_not_owned_by_creator', false, {
+          parentId: data.parentId,
+          specimenId: specimen.id,
+        });
+      }
     }
-  }
 
-  if (data.photoUrl && data.photoKey) {
-    await pool.query(
-      `INSERT INTO public."CoralPhoto" (id, "s3Key", url, "coralId", status, "createdAt")
-       VALUES (gen_random_uuid()::text, $1, $2, $3, 'pending', NOW())`,
-      [data.photoKey, data.photoUrl, specimen.id]
+    if (data.photoUrl && data.photoKey) {
+      await pool.query(
+        `INSERT INTO public."CoralPhoto" (id, "s3Key", url, "coralId", status, "createdAt")
+         VALUES (gen_random_uuid()::text, $1, $2, $3, 'pending', NOW())`,
+        [data.photoKey, data.photoUrl, specimen.id]
+      );
+    }
+
+    revalidatePath('/collection');
+
+    // Welcome email on first specimen only
+    const { rows: countRows } = await pool.query<{ count: string }>(
+      'SELECT COUNT(*)::text AS count FROM public."Coral" WHERE "ownerId" = $1',
+      [user.id]
     );
-  }
+    if (parseInt(countRows[0].count, 10) === 1) {
+      sendEmail(user.email, 'Your collection has started 🪸', welcomeTemplate(user.name ?? user.email))
+        .catch((err) => console.error('[specimens] welcome email failed:', err));
+    }
 
-  revalidatePath('/collection');
-
-  // Welcome email on first specimen only
-  const { rows: countRows } = await pool.query<{ count: string }>(
-    'SELECT COUNT(*)::text AS count FROM public."Coral" WHERE "ownerId" = $1',
-    [user.id]
-  );
-  if (parseInt(countRows[0].count, 10) === 1) {
-    sendEmail(user.email, 'Your collection has started 🪸', welcomeTemplate(user.name ?? user.email))
-      .catch((err) => console.error('[specimens] welcome email failed:', err));
-  }
-
-  return specimen;
+    return specimen;
+  });
 }
 
 type PhotoRow = { id: string; s3Key: string; status: string; createdAt: string };
@@ -177,40 +181,42 @@ export async function addSpecimenPhoto(data: {
   photoKey: string;
   photoUrl: string;
 }): Promise<AddedPhoto> {
-  const user = await getCurrentUser();
+  return trackAction('addSpecimenPhoto', { ...data }, async () => {
+    const user = await getCurrentUser();
 
-  // You may photograph a coral you own, and also an UNCLAIMED frag cut from a
-  // coral you own — the person holding a freshly cut plug is the parent's
-  // owner, and the frag is ownerless until claimed. Deliberately narrow: this
-  // grants nothing on someone else's claimed coral, and the permission lapses
-  // the moment the frag is claimed.
-  const { rows } = await pool.query<{ ownerId: string | null; parentOwnerId: string | null }>(
-    `SELECT c."ownerId", p."ownerId" AS "parentOwnerId"
-     FROM public."Coral" c
-     LEFT JOIN public."Lineage" l ON l."childId" = c.id
-     LEFT JOIN public."Coral" p ON p.id = l."parentId"
-     WHERE c.id = $1`,
-    [data.specimenId]
-  );
-  const row = rows[0];
-  const ownsIt = row?.ownerId === user.id;
-  const ownsUnclaimedChild = row?.ownerId === null && row?.parentOwnerId === user.id;
-  if (!row || (!ownsIt && !ownsUnclaimedChild)) throw new Error('Not authorized');
+    // You may photograph a coral you own, and also an UNCLAIMED frag cut from a
+    // coral you own — the person holding a freshly cut plug is the parent's
+    // owner, and the frag is ownerless until claimed. Deliberately narrow: this
+    // grants nothing on someone else's claimed coral, and the permission lapses
+    // the moment the frag is claimed.
+    const { rows } = await pool.query<{ ownerId: string | null; parentOwnerId: string | null }>(
+      `SELECT c."ownerId", p."ownerId" AS "parentOwnerId"
+       FROM public."Coral" c
+       LEFT JOIN public."Lineage" l ON l."childId" = c.id
+       LEFT JOIN public."Coral" p ON p.id = l."parentId"
+       WHERE c.id = $1`,
+      [data.specimenId]
+    );
+    const row = rows[0];
+    const ownsIt = row?.ownerId === user.id;
+    const ownsUnclaimedChild = row?.ownerId === null && row?.parentOwnerId === user.id;
+    if (!row || (!ownsIt && !ownsUnclaimedChild)) throw new Error('Not authorized');
 
-  // Returns the row so the caller can append it without a refetch. The url is
-  // rebuilt from the key rather than trusting data.photoUrl — every read path
-  // derives it this way, and a caller passing a raw bucket URL is exactly the
-  // bug that made frag thumbnails render blank.
-  const { rows: created } = await pool.query<{ id: string; s3Key: string; status: string }>(
-    `INSERT INTO public."CoralPhoto" (id, "s3Key", url, "coralId", status, "createdAt")
-     VALUES (gen_random_uuid()::text, $1, $2, $3, 'pending', NOW())
-     RETURNING id, "s3Key", status`,
-    [data.photoKey, data.photoUrl, data.specimenId]
-  );
+    // Returns the row so the caller can append it without a refetch. The url is
+    // rebuilt from the key rather than trusting data.photoUrl — every read path
+    // derives it this way, and a caller passing a raw bucket URL is exactly the
+    // bug that made frag thumbnails render blank.
+    const { rows: created } = await pool.query<{ id: string; s3Key: string; status: string }>(
+      `INSERT INTO public."CoralPhoto" (id, "s3Key", url, "coralId", status, "createdAt")
+       VALUES (gen_random_uuid()::text, $1, $2, $3, 'pending', NOW())
+       RETURNING id, "s3Key", status`,
+      [data.photoKey, data.photoUrl, data.specimenId]
+    );
 
-  revalidatePath(`/collection/${data.specimenId}`);
-  const photo = created[0];
-  return { id: photo.id, url: imageProxyUrl(photo.s3Key), status: photo.status };
+    revalidatePath(`/collection/${data.specimenId}`);
+    const photo = created[0];
+    return { id: photo.id, url: imageProxyUrl(photo.s3Key), status: photo.status };
+  });
 }
 
 // ownerId/ownerUsername are null for unclaimed frags — rows created by
@@ -227,93 +233,97 @@ export type SpecimenDetail = SpecimenRow & {
 };
 
 export async function getPublicSpecimen(rfCodeOrId: string): Promise<SpecimenDetail | null> {
-  const { rows } = await pool.query<SpecimenDetail>(
-    `SELECT
-       c.id, c.name, c.species, c.category, c."rfCode", c.origin, c.notes,
-       c."identityHue", c."acquiredDate", c."createdAt", c."updatedAt",
-       c."tankName", c."lightPar", c."flowLevel",
-       c."stage", c."acquiredStage", c."generationFromMother", c."sourceColony", c."vendor",
-       c.status, c."statusAt", c."statusNote", c."givenTo",
-       c."ownerId",
-       u.username AS "ownerUsername",
-       u."displayName" AS "ownerDisplayName",
-       false AS "isOwner",
-       NULL AS "coverPhotoUrl",
-       0 AS "fragsGiven", 0 AS "generationsBack", 0 AS "photoCount",
-       COALESCE(
-         json_agg(
-           json_build_object('id', p.id, 's3Key', p."s3Key", 'status', p.status, 'createdAt', p."createdAt")
-           ORDER BY p."createdAt" ASC
-         ) FILTER (WHERE p.id IS NOT NULL AND p.status = 'approved'),
-         '[]'
-       ) AS photos
-     FROM public."Coral" c
-     LEFT JOIN public."User" u ON u.id = c."ownerId"
-     LEFT JOIN public."CoralPhoto" p ON p."coralId" = c.id
-     WHERE c."rfCode" = $1 OR c.id = $1
-     GROUP BY c.id, u.username, u."displayName"
-     LIMIT 1`,
-    [rfCodeOrId]
-  );
-
-  if (rows[0]) return withPhotoUrls(rows[0]);
-
-  if (!rows[0]) {
-    // This returning null 404s the public page. If the code exists in Coral,
-    // the query is dropping a real row — which is exactly how unclaimed frags
-    // were invisible for weeks (inner join on a NULL owner).
-    const { rows: exists } = await pool.query<{ n: number }>(
-      'SELECT COUNT(*)::int AS n FROM public."Coral" WHERE "rfCode" = $1 OR id = $1',
+  return trackAction('getPublicSpecimen', { rfCodeOrId }, async () => {
+    const { rows } = await pool.query<SpecimenDetail>(
+      `SELECT
+         c.id, c.name, c.species, c.category, c."rfCode", c.origin, c.notes,
+         c."identityHue", c."acquiredDate", c."createdAt", c."updatedAt",
+         c."tankName", c."lightPar", c."flowLevel",
+         c."stage", c."acquiredStage", c."generationFromMother", c."sourceColony", c."vendor",
+         c.status, c."statusAt", c."statusNote", c."givenTo",
+         c."ownerId",
+         u.username AS "ownerUsername",
+         u."displayName" AS "ownerDisplayName",
+         false AS "isOwner",
+         NULL AS "coverPhotoUrl",
+         0 AS "fragsGiven", 0 AS "generationsBack", 0 AS "photoCount",
+         COALESCE(
+           json_agg(
+             json_build_object('id', p.id, 's3Key', p."s3Key", 'status', p.status, 'createdAt', p."createdAt")
+             ORDER BY p."createdAt" ASC
+           ) FILTER (WHERE p.id IS NOT NULL AND p.status = 'approved'),
+           '[]'
+         ) AS photos
+       FROM public."Coral" c
+       LEFT JOIN public."User" u ON u.id = c."ownerId"
+       LEFT JOIN public."CoralPhoto" p ON p."coralId" = c.id
+       WHERE c."rfCode" = $1 OR c.id = $1
+       GROUP BY c.id, u.username, u."displayName"
+       LIMIT 1`,
       [rfCodeOrId]
     );
-    invariant('public_specimen.exists_but_query_returned_null', exists[0].n === 0, {
-      rfCodeOrId,
-    });
-    return null;
-  }
 
-  return rows[0];
+    if (rows[0]) return withPhotoUrls(rows[0]);
+
+    if (!rows[0]) {
+      // This returning null 404s the public page. If the code exists in Coral,
+      // the query is dropping a real row — which is exactly how unclaimed frags
+      // were invisible for weeks (inner join on a NULL owner).
+      const { rows: exists } = await pool.query<{ n: number }>(
+        'SELECT COUNT(*)::int AS n FROM public."Coral" WHERE "rfCode" = $1 OR id = $1',
+        [rfCodeOrId]
+      );
+      invariant('public_specimen.exists_but_query_returned_null', exists[0].n === 0, {
+        rfCodeOrId,
+      });
+      return null;
+    }
+
+    return rows[0];
+  });
 }
 
 export async function getSpecimen(rfCodeOrId: string): Promise<SpecimenDetail | null> {
-  let viewerId: string | null = null;
-  try { viewerId = (await getCurrentUser()).id; } catch {}
+  return trackAction('getSpecimen', { rfCodeOrId }, async () => {
+    let viewerId: string | null = null;
+    try { viewerId = (await getCurrentUser()).id; } catch {}
 
-  const { rows } = await pool.query<SpecimenDetail>(
-    `SELECT
-       c.id, c.name, c.species, c.category, c."rfCode", c.origin, c.notes,
-       c."identityHue", c."acquiredDate", c."createdAt", c."updatedAt",
-       c."tankName", c."lightPar", c."flowLevel",
-       c."stage", c."acquiredStage", c."generationFromMother", c."sourceColony", c."vendor",
-       c.status, c."statusAt", c."statusNote", c."givenTo",
-       c."ownerId",
-       u.username AS "ownerUsername",
-       u."displayName" AS "ownerDisplayName",
-       (c."ownerId" = $2) AS "isOwner",
-       NULL AS "coverPhotoUrl",
-       (SELECT COUNT(*)::int FROM public."Lineage" WHERE "parentId" = c.id) AS "fragsGiven",
-       (WITH RECURSIVE anc AS (
-         SELECT "parentId" FROM public."Lineage" WHERE "childId" = c.id
-         UNION ALL
-         SELECT l."parentId" FROM public."Lineage" l JOIN anc ON l."childId" = anc."parentId"
-       ) SELECT COUNT(*)::int FROM anc) AS "generationsBack",
-       (SELECT COUNT(*)::int FROM public."CoralPhoto" WHERE "coralId" = c.id) AS "photoCount",
-       COALESCE(
-         json_agg(
-           json_build_object('id', p.id, 's3Key', p."s3Key", 'status', p.status, 'createdAt', p."createdAt")
-           ORDER BY p."createdAt" ASC
-         ) FILTER (WHERE p.id IS NOT NULL AND (p.status = 'approved' OR c."ownerId" = $2)),
-         '[]'
-       ) AS photos
-     FROM public."Coral" c
-     JOIN public."User" u ON u.id = c."ownerId"
-     LEFT JOIN public."CoralPhoto" p ON p."coralId" = c.id
-     WHERE c."rfCode" = $1 OR c.id = $1
-     GROUP BY c.id, u.username, u."displayName"
-     LIMIT 1`,
-    [rfCodeOrId, viewerId]
-  );
-  return rows[0] ? withPhotoUrls(rows[0]) : null;
+    const { rows } = await pool.query<SpecimenDetail>(
+      `SELECT
+         c.id, c.name, c.species, c.category, c."rfCode", c.origin, c.notes,
+         c."identityHue", c."acquiredDate", c."createdAt", c."updatedAt",
+         c."tankName", c."lightPar", c."flowLevel",
+         c."stage", c."acquiredStage", c."generationFromMother", c."sourceColony", c."vendor",
+         c.status, c."statusAt", c."statusNote", c."givenTo",
+         c."ownerId",
+         u.username AS "ownerUsername",
+         u."displayName" AS "ownerDisplayName",
+         (c."ownerId" = $2) AS "isOwner",
+         NULL AS "coverPhotoUrl",
+         (SELECT COUNT(*)::int FROM public."Lineage" WHERE "parentId" = c.id) AS "fragsGiven",
+         (WITH RECURSIVE anc AS (
+           SELECT "parentId" FROM public."Lineage" WHERE "childId" = c.id
+           UNION ALL
+           SELECT l."parentId" FROM public."Lineage" l JOIN anc ON l."childId" = anc."parentId"
+         ) SELECT COUNT(*)::int FROM anc) AS "generationsBack",
+         (SELECT COUNT(*)::int FROM public."CoralPhoto" WHERE "coralId" = c.id) AS "photoCount",
+         COALESCE(
+           json_agg(
+             json_build_object('id', p.id, 's3Key', p."s3Key", 'status', p.status, 'createdAt', p."createdAt")
+             ORDER BY p."createdAt" ASC
+           ) FILTER (WHERE p.id IS NOT NULL AND (p.status = 'approved' OR c."ownerId" = $2)),
+           '[]'
+         ) AS photos
+       FROM public."Coral" c
+       JOIN public."User" u ON u.id = c."ownerId"
+       LEFT JOIN public."CoralPhoto" p ON p."coralId" = c.id
+       WHERE c."rfCode" = $1 OR c.id = $1
+       GROUP BY c.id, u.username, u."displayName"
+       LIMIT 1`,
+      [rfCodeOrId, viewerId]
+    );
+    return rows[0] ? withPhotoUrls(rows[0]) : null;
+  });
 }
 
 export async function updateSpecimen(id: string, data: {
@@ -331,26 +341,28 @@ export async function updateSpecimen(id: string, data: {
   sourceColony?: string;
   vendor?: string;
 }): Promise<void> {
-  const user = await getCurrentUser();
-  const res = await pool.query(
-    `UPDATE public."Coral"
-     SET name=$1, species=$2, category=$3::\"CoralCategory\", origin=$4, notes=$5,
-         "tankName"=$6, "lightPar"=$7, "flowLevel"=$8,
-         stage=$9::\"CoralStage\", "acquiredStage"=$10::\"CoralStage\",
-         "generationFromMother"=$11, "sourceColony"=$12, vendor=$13,
-         "updatedAt"=NOW()
-     WHERE id=$14 AND "ownerId"=$15`,
-    [
-      data.name, data.species ?? null, data.category, data.origin ?? null, data.notes ?? null,
-      data.tankName ?? null, data.lightPar ?? null, data.flowLevel ?? null,
-      data.stage ?? null, data.acquiredStage ?? null,
-      data.generationFromMother ?? null, data.sourceColony ?? null, data.vendor ?? null,
-      id, user.id,
-    ]
-  );
-  invariant('specimen.update_matched_no_rows', res.rowCount === 1, { specimenId: id });
-  revalidatePath('/collection');
-  revalidatePath(`/collection/${id}`);
+  return trackAction('updateSpecimen', { id, ...data }, async () => {
+    const user = await getCurrentUser();
+    const res = await pool.query(
+      `UPDATE public."Coral"
+       SET name=$1, species=$2, category=$3::\"CoralCategory\", origin=$4, notes=$5,
+           "tankName"=$6, "lightPar"=$7, "flowLevel"=$8,
+           stage=$9::\"CoralStage\", "acquiredStage"=$10::\"CoralStage\",
+           "generationFromMother"=$11, "sourceColony"=$12, vendor=$13,
+           "updatedAt"=NOW()
+       WHERE id=$14 AND "ownerId"=$15`,
+      [
+        data.name, data.species ?? null, data.category, data.origin ?? null, data.notes ?? null,
+        data.tankName ?? null, data.lightPar ?? null, data.flowLevel ?? null,
+        data.stage ?? null, data.acquiredStage ?? null,
+        data.generationFromMother ?? null, data.sourceColony ?? null, data.vendor ?? null,
+        id, user.id,
+      ]
+    );
+    invariant('specimen.update_matched_no_rows', res.rowCount === 1, { specimenId: id });
+    revalidatePath('/collection');
+    revalidatePath(`/collection/${id}`);
+  });
 }
 
 export type PublicSpecimenStub = {
@@ -363,30 +375,34 @@ export type PublicSpecimenStub = {
 };
 
 export async function getMoreByOwner(ownerId: string, excludeId: string, limit = 4): Promise<PublicSpecimenStub[]> {
-  const { rows } = await pool.query<Omit<PublicSpecimenStub, 'coverPhotoUrl'> & { coverKey: string | null }>(
-    `SELECT c.id, c.name, c."rfCode", c."identityHue", c.category,
-       (SELECT p."s3Key" FROM public."CoralPhoto" p
-        WHERE p."coralId" = c.id AND p.status = 'approved'
-        ORDER BY p."createdAt" ASC LIMIT 1) AS "coverKey"
-     FROM public."Coral" c
-     WHERE c."ownerId" = $1 AND c.id != $2
-     ORDER BY c."createdAt" DESC
-     LIMIT $3`,
-    [ownerId, excludeId, limit]
-  );
-  return rows.map(({ coverKey, ...r }) => ({
-    ...r,
-    coverPhotoUrl: coverKey ? imageProxyUrl(coverKey) : null,
-  }));
+  return trackAction('getMoreByOwner', { ownerId, excludeId, limit }, async () => {
+    const { rows } = await pool.query<Omit<PublicSpecimenStub, 'coverPhotoUrl'> & { coverKey: string | null }>(
+      `SELECT c.id, c.name, c."rfCode", c."identityHue", c.category,
+         (SELECT p."s3Key" FROM public."CoralPhoto" p
+          WHERE p."coralId" = c.id AND p.status = 'approved'
+          ORDER BY p."createdAt" ASC LIMIT 1) AS "coverKey"
+       FROM public."Coral" c
+       WHERE c."ownerId" = $1 AND c.id != $2
+       ORDER BY c."createdAt" DESC
+       LIMIT $3`,
+      [ownerId, excludeId, limit]
+    );
+    return rows.map(({ coverKey, ...r }) => ({
+      ...r,
+      coverPhotoUrl: coverKey ? imageProxyUrl(coverKey) : null,
+    }));
+  });
 }
 
 export async function searchCoralNames(query: string): Promise<string[]> {
-  if (query.length < 2) return [];
-  const { rows } = await pool.query<{ name: string }>(
-    `SELECT DISTINCT name FROM public."Coral" WHERE name ILIKE $1 ORDER BY name LIMIT 8`,
-    [`${query}%`]
-  );
-  return rows.map(r => r.name);
+  return trackAction('searchCoralNames', { query }, async () => {
+    if (query.length < 2) return [];
+    const { rows } = await pool.query<{ name: string }>(
+      `SELECT DISTINCT name FROM public."Coral" WHERE name ILIKE $1 ORDER BY name LIMIT 8`,
+      [`${query}%`]
+    );
+    return rows.map(r => r.name);
+  });
 }
 
 export type CoralStatus = 'ALIVE' | 'LOST' | 'SOLD' | 'GIVEN';
@@ -404,57 +420,61 @@ export async function deleteSpecimen(
   status: Exclude<CoralStatus, 'ALIVE'> = 'LOST',
   note?: string
 ): Promise<void> {
-  const user = await getCurrentUser();
+  return trackAction('deleteSpecimen', { id, status, note }, async () => {
+    const user = await getCurrentUser();
 
-  const res = await pool.query(
-    `UPDATE public."Coral"
-        SET status = $1::"CoralStatus", "statusAt" = NOW(), "statusNote" = $2, "updatedAt" = NOW()
-      WHERE id = $3 AND "ownerId" = $4`,
-    [status, note ?? null, id, user.id]
-  );
-  invariant('specimen.remove_matched_no_rows', res.rowCount === 1, { specimenId: id });
+    const res = await pool.query(
+      `UPDATE public."Coral"
+          SET status = $1::"CoralStatus", "statusAt" = NOW(), "statusNote" = $2, "updatedAt" = NOW()
+        WHERE id = $3 AND "ownerId" = $4`,
+      [status, note ?? null, id, user.id]
+    );
+    invariant('specimen.remove_matched_no_rows', res.rowCount === 1, { specimenId: id });
 
-  // CoralStatus and CoralEventType are different enums that overlap only on
-  // SOLD: there is no LOST event, and GIVEN is spelled GIFTED. Writing the
-  // status straight into "eventType" made every LOST/GIVEN insert fail.
-  const eventType = status === 'SOLD' ? 'SOLD' : status === 'GIVEN' ? 'GIFTED' : 'OBSERVATION';
+    // CoralStatus and CoralEventType are different enums that overlap only on
+    // SOLD: there is no LOST event, and GIVEN is spelled GIFTED. Writing the
+    // status straight into "eventType" made every LOST/GIVEN insert fail.
+    const eventType = status === 'SOLD' ? 'SOLD' : status === 'GIVEN' ? 'GIFTED' : 'OBSERVATION';
 
-  const audit = await pool.query(
-    `INSERT INTO public."CoralOwnershipEvent" (id, "coralId", "eventType", date, notes, "createdAt")
-     VALUES (gen_random_uuid()::text, $1, $2::"CoralEventType", NOW(), $3, NOW())`,
-    [id, eventType, note ?? `Marked ${status.toLowerCase()}`]
-  );
-  invariant('specimen.ownership_event_not_written', audit.rowCount === 1, {
-    specimenId: id,
-    status,
+    const audit = await pool.query(
+      `INSERT INTO public."CoralOwnershipEvent" (id, "coralId", "eventType", date, notes, "createdAt")
+       VALUES (gen_random_uuid()::text, $1, $2::"CoralEventType", NOW(), $3, NOW())`,
+      [id, eventType, note ?? `Marked ${status.toLowerCase()}`]
+    );
+    invariant('specimen.ownership_event_not_written', audit.rowCount === 1, {
+      specimenId: id,
+      status,
+    });
+
+    revalidatePath('/collection');
+    revalidatePath(`/collection/${id}`);
   });
-
-  revalidatePath('/collection');
-  revalidatePath(`/collection/${id}`);
 }
 
 /** Bring a coral back to ALIVE — undo for an accidental removal. */
 export async function restoreSpecimen(id: string): Promise<{ error?: string }> {
-  const user = await getCurrentUser();
+  return trackAction('restoreSpecimen', { id }, async () => {
+    const user = await getCurrentUser();
 
-  // checkSpecimenCap counts only ALIVE corals, so restoring adds one back to
-  // the living collection. Refuse rather than silently exceeding the limit.
-  const cap = await checkSpecimenCap(user);
-  if (!cap.ok) return { error: cap.error };
+    // checkSpecimenCap counts only ALIVE corals, so restoring adds one back to
+    // the living collection. Refuse rather than silently exceeding the limit.
+    const cap = await checkSpecimenCap(user);
+    if (!cap.ok) return { error: cap.error };
 
-  // Scoped to the owner, so a miss means the coral is gone or not theirs.
-  // Without this the UI reports a successful restore that never happened.
-  const res = await pool.query(
-    `UPDATE public."Coral"
-        SET status = 'ALIVE'::"CoralStatus", "statusAt" = NULL, "statusNote" = NULL, "updatedAt" = NOW()
-      WHERE id = $1 AND "ownerId" = $2`,
-    [id, user.id]
-  );
-  if (res.rowCount !== 1) return { error: 'Specimen not found' };
+    // Scoped to the owner, so a miss means the coral is gone or not theirs.
+    // Without this the UI reports a successful restore that never happened.
+    const res = await pool.query(
+      `UPDATE public."Coral"
+          SET status = 'ALIVE'::"CoralStatus", "statusAt" = NULL, "statusNote" = NULL, "updatedAt" = NOW()
+        WHERE id = $1 AND "ownerId" = $2`,
+      [id, user.id]
+    );
+    if (res.rowCount !== 1) return { error: 'Specimen not found' };
 
-  revalidatePath('/collection');
-  revalidatePath(`/collection/${id}`);
-  return {};
+    revalidatePath('/collection');
+    revalidatePath(`/collection/${id}`);
+    return {};
+  });
 }
 
 export type SitemapEntry = { path: string; updatedAt: string };
@@ -465,22 +485,24 @@ export type SitemapEntry = { path: string; updatedAt: string };
  * scanning a frag tag or googling a code should land on.
  */
 export async function getPublicUrls(): Promise<SitemapEntry[]> {
-  const { rows: corals } = await pool.query<SitemapEntry>(
-    `SELECT '/coral/' || COALESCE(c."rfCode", c.id) AS path,
-            GREATEST(c."updatedAt", c."createdAt") AS "updatedAt"
-     FROM public."Coral" c
-     WHERE c."rfCode" IS NOT NULL
-     ORDER BY c."updatedAt" DESC
-     LIMIT 5000`
-  );
+  return trackAction('getPublicUrls', {}, async () => {
+    const { rows: corals } = await pool.query<SitemapEntry>(
+      `SELECT '/coral/' || COALESCE(c."rfCode", c.id) AS path,
+              GREATEST(c."updatedAt", c."createdAt") AS "updatedAt"
+       FROM public."Coral" c
+       WHERE c."rfCode" IS NOT NULL
+       ORDER BY c."updatedAt" DESC
+       LIMIT 5000`
+    );
 
-  const { rows: users } = await pool.query<SitemapEntry>(
-    `SELECT '/users/' || u.username AS path, NOW() AS "updatedAt"
-     FROM public."User" u
-     WHERE u.username IS NOT NULL
-       AND EXISTS (SELECT 1 FROM public."Coral" c WHERE c."ownerId" = u.id)
-     LIMIT 5000`
-  );
+    const { rows: users } = await pool.query<SitemapEntry>(
+      `SELECT '/users/' || u.username AS path, NOW() AS "updatedAt"
+       FROM public."User" u
+       WHERE u.username IS NOT NULL
+         AND EXISTS (SELECT 1 FROM public."Coral" c WHERE c."ownerId" = u.id)
+       LIMIT 5000`
+    );
 
-  return [...corals, ...users];
+    return [...corals, ...users];
+  });
 }

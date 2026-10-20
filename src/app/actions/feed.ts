@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { pool } from '@/lib/db';
 import { imageProxyUrl } from '@/lib/s3';
 import { auth } from '@/lib/auth';
+import { trackAction } from '@/lib/log';
 
 export type FeedEventKind = 'specimen' | 'lineage' | 'listing';
 
@@ -46,140 +47,144 @@ export type NewKeeper = {
 };
 
 export async function getNewKeepers(limit = 8): Promise<NewKeeper[]> {
-  const { rows } = await pool.query<NewKeeper>(
-    `SELECT
-       u.id,
-       u.username,
-       u."displayName",
-       ABS(HASHTEXT(u.id)) % 360 AS hue,
-       u."createdAt",
-       (SELECT COUNT(*)::int FROM public."Coral" c WHERE c."ownerId" = u.id) AS "specimenCount"
-     FROM public."User" u
-     WHERE u."createdAt" > NOW() - INTERVAL '30 days'
-     ORDER BY u."createdAt" DESC
-     LIMIT $1`,
-    [limit]
-  );
-  return rows;
+  return trackAction('getNewKeepers', { limit }, async () => {
+    const { rows } = await pool.query<NewKeeper>(
+      `SELECT
+         u.id,
+         u.username,
+         u."displayName",
+         ABS(HASHTEXT(u.id)) % 360 AS hue,
+         u."createdAt",
+         (SELECT COUNT(*)::int FROM public."Coral" c WHERE c."ownerId" = u.id) AS "specimenCount"
+       FROM public."User" u
+       WHERE u."createdAt" > NOW() - INTERVAL '30 days'
+       ORDER BY u."createdAt" DESC
+       LIMIT $1`,
+      [limit]
+    );
+    return rows;
+  });
 }
 
 export async function getFeedItems(limit = 30): Promise<FeedItem[]> {
-  const session = await auth.api.getSession({ headers: await headers() }).catch(() => null);
-  const currentUserId = session?.user?.id ?? null;
+  return trackAction('getFeedItems', { limit }, async () => {
+    const session = await auth.api.getSession({ headers: await headers() }).catch(() => null);
+    const currentUserId = session?.user?.id ?? null;
 
-  // deterministic hue from string
-  const { rows } = await pool.query<Omit<FeedItem, 'specimenCoverUrl'> & { specimenCoverKey: string | null }>(
-    `WITH actor_hue AS (
-       SELECT id, ABS(HASHTEXT(id)) % 360 AS hue FROM public."User"
-     ),
-     new_specimens AS (
-       SELECT
-         'specimen-' || c.id AS id,
-         'specimen'::text AS kind,
-         c."createdAt",
-         u.id AS "actorId",
-         u.username AS "actorUsername",
-         u."displayName" AS "actorDisplayName",
-         ah.hue AS "actorHue",
-         c.id AS "specimenId",
-         c.name AS "specimenName",
-         c."rfCode" AS "specimenRfCode",
-         c.category AS "specimenCategory",
-         c.species AS "specimenSpecies",
-         c."identityHue" AS "specimenIdentityHue",
-         c.notes AS "specimenNotes",
-         (SELECT p."s3Key"
-          FROM public."CoralPhoto" p
-          WHERE p."coralId" = c.id AND p.status = 'approved'
-          ORDER BY p."createdAt" ASC LIMIT 1) AS "specimenCoverKey",
-         NULL::text AS "parentId",
-         NULL::text AS "parentName",
-         NULL::text AS "parentRfCode",
-         NULL::int AS "parentHue",
-         NULL::text AS "listingId",
-         NULL::float8 AS "listingPrice",
-         NULL::int AS "listingQty",
-         NULL::text AS "listingNotes"
-       FROM public."Coral" c
-       JOIN public."User" u ON u.id = c."ownerId"
-       JOIN actor_hue ah ON ah.id = u.id
-     ),
-     new_lineage AS (
-       SELECT
-         'lineage-' || l.id AS id,
-         'lineage'::text AS kind,
-         l."createdAt",
-         u.id AS "actorId",
-         u.username AS "actorUsername",
-         u."displayName" AS "actorDisplayName",
-         ah.hue AS "actorHue",
-         child.id AS "specimenId",
-         child.name AS "specimenName",
-         child."rfCode" AS "specimenRfCode",
-         child.category AS "specimenCategory",
-         child.species AS "specimenSpecies",
-         child."identityHue" AS "specimenIdentityHue",
-         child.notes AS "specimenNotes",
-         (SELECT p."s3Key"
-          FROM public."CoralPhoto" p
-          WHERE p."coralId" = child.id
-          ORDER BY p."createdAt" ASC LIMIT 1) AS "specimenCoverKey",
-         parent.id AS "parentId",
-         parent.name AS "parentName",
-         parent."rfCode" AS "parentRfCode",
-         parent."identityHue" AS "parentHue",
-         NULL::text AS "listingId",
-         NULL::float8 AS "listingPrice",
-         NULL::int AS "listingQty",
-         NULL::text AS "listingNotes"
-       FROM public."Lineage" l
-       JOIN public."Coral" child ON child.id = l."childId"
-       JOIN public."Coral" parent ON parent.id = l."parentId"
-       JOIN public."User" u ON u.id = child."ownerId"
-       JOIN actor_hue ah ON ah.id = u.id
-     ),
-     new_listings AS (
-       SELECT
-         'listing-' || fl.id AS id,
-         'listing'::text AS kind,
-         fl."createdAt",
-         u.id AS "actorId",
-         u.username AS "actorUsername",
-         u."displayName" AS "actorDisplayName",
-         ah.hue AS "actorHue",
-         c.id AS "specimenId",
-         c.name AS "specimenName",
-         c."rfCode" AS "specimenRfCode",
-         c.category AS "specimenCategory",
-         c.species AS "specimenSpecies",
-         c."identityHue" AS "specimenIdentityHue",
-         c.notes AS "specimenNotes",
-         (SELECT p."s3Key"
-          FROM public."CoralPhoto" p
-          WHERE p."coralId" = c.id
-          ORDER BY p."createdAt" ASC LIMIT 1) AS "specimenCoverKey",
-         NULL::text AS "parentId",
-         NULL::text AS "parentName",
-         NULL::text AS "parentRfCode",
-         NULL::int AS "parentHue",
-         fl.id AS "listingId",
-         fl.price AS "listingPrice",
-         fl.qty AS "listingQty",
-         fl.notes AS "listingNotes"
-       FROM public."FragListing" fl
-       JOIN public."Coral" c ON c.id = fl."coralId"
-       JOIN public."User" u ON u.id = fl."userId"
-       JOIN actor_hue ah ON ah.id = u.id
-     )
-     SELECT * FROM new_specimens
-     UNION ALL SELECT * FROM new_lineage
-     UNION ALL SELECT * FROM new_listings
-     ORDER BY "createdAt" DESC
-     LIMIT $1`,
-    [limit]
-  );
-  return rows.map(({ specimenCoverKey, ...r }) => ({
-    ...r,
-    specimenCoverUrl: specimenCoverKey ? imageProxyUrl(specimenCoverKey) : null,
-  }));
+    // deterministic hue from string
+    const { rows } = await pool.query<Omit<FeedItem, 'specimenCoverUrl'> & { specimenCoverKey: string | null }>(
+      `WITH actor_hue AS (
+         SELECT id, ABS(HASHTEXT(id)) % 360 AS hue FROM public."User"
+       ),
+       new_specimens AS (
+         SELECT
+           'specimen-' || c.id AS id,
+           'specimen'::text AS kind,
+           c."createdAt",
+           u.id AS "actorId",
+           u.username AS "actorUsername",
+           u."displayName" AS "actorDisplayName",
+           ah.hue AS "actorHue",
+           c.id AS "specimenId",
+           c.name AS "specimenName",
+           c."rfCode" AS "specimenRfCode",
+           c.category AS "specimenCategory",
+           c.species AS "specimenSpecies",
+           c."identityHue" AS "specimenIdentityHue",
+           c.notes AS "specimenNotes",
+           (SELECT p."s3Key"
+            FROM public."CoralPhoto" p
+            WHERE p."coralId" = c.id AND p.status = 'approved'
+            ORDER BY p."createdAt" ASC LIMIT 1) AS "specimenCoverKey",
+           NULL::text AS "parentId",
+           NULL::text AS "parentName",
+           NULL::text AS "parentRfCode",
+           NULL::int AS "parentHue",
+           NULL::text AS "listingId",
+           NULL::float8 AS "listingPrice",
+           NULL::int AS "listingQty",
+           NULL::text AS "listingNotes"
+         FROM public."Coral" c
+         JOIN public."User" u ON u.id = c."ownerId"
+         JOIN actor_hue ah ON ah.id = u.id
+       ),
+       new_lineage AS (
+         SELECT
+           'lineage-' || l.id AS id,
+           'lineage'::text AS kind,
+           l."createdAt",
+           u.id AS "actorId",
+           u.username AS "actorUsername",
+           u."displayName" AS "actorDisplayName",
+           ah.hue AS "actorHue",
+           child.id AS "specimenId",
+           child.name AS "specimenName",
+           child."rfCode" AS "specimenRfCode",
+           child.category AS "specimenCategory",
+           child.species AS "specimenSpecies",
+           child."identityHue" AS "specimenIdentityHue",
+           child.notes AS "specimenNotes",
+           (SELECT p."s3Key"
+            FROM public."CoralPhoto" p
+            WHERE p."coralId" = child.id
+            ORDER BY p."createdAt" ASC LIMIT 1) AS "specimenCoverKey",
+           parent.id AS "parentId",
+           parent.name AS "parentName",
+           parent."rfCode" AS "parentRfCode",
+           parent."identityHue" AS "parentHue",
+           NULL::text AS "listingId",
+           NULL::float8 AS "listingPrice",
+           NULL::int AS "listingQty",
+           NULL::text AS "listingNotes"
+         FROM public."Lineage" l
+         JOIN public."Coral" child ON child.id = l."childId"
+         JOIN public."Coral" parent ON parent.id = l."parentId"
+         JOIN public."User" u ON u.id = child."ownerId"
+         JOIN actor_hue ah ON ah.id = u.id
+       ),
+       new_listings AS (
+         SELECT
+           'listing-' || fl.id AS id,
+           'listing'::text AS kind,
+           fl."createdAt",
+           u.id AS "actorId",
+           u.username AS "actorUsername",
+           u."displayName" AS "actorDisplayName",
+           ah.hue AS "actorHue",
+           c.id AS "specimenId",
+           c.name AS "specimenName",
+           c."rfCode" AS "specimenRfCode",
+           c.category AS "specimenCategory",
+           c.species AS "specimenSpecies",
+           c."identityHue" AS "specimenIdentityHue",
+           c.notes AS "specimenNotes",
+           (SELECT p."s3Key"
+            FROM public."CoralPhoto" p
+            WHERE p."coralId" = c.id
+            ORDER BY p."createdAt" ASC LIMIT 1) AS "specimenCoverKey",
+           NULL::text AS "parentId",
+           NULL::text AS "parentName",
+           NULL::text AS "parentRfCode",
+           NULL::int AS "parentHue",
+           fl.id AS "listingId",
+           fl.price AS "listingPrice",
+           fl.qty AS "listingQty",
+           fl.notes AS "listingNotes"
+         FROM public."FragListing" fl
+         JOIN public."Coral" c ON c.id = fl."coralId"
+         JOIN public."User" u ON u.id = fl."userId"
+         JOIN actor_hue ah ON ah.id = u.id
+       )
+       SELECT * FROM new_specimens
+       UNION ALL SELECT * FROM new_lineage
+       UNION ALL SELECT * FROM new_listings
+       ORDER BY "createdAt" DESC
+       LIMIT $1`,
+      [limit]
+    );
+    return rows.map(({ specimenCoverKey, ...r }) => ({
+      ...r,
+      specimenCoverUrl: specimenCoverKey ? imageProxyUrl(specimenCoverKey) : null,
+    }));
+  });
 }

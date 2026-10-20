@@ -95,6 +95,25 @@ describe('resolvePhotoAccess', () => {
     expect(await resolvePhotoAccess(key, owner.id)).toEqual({ ok: false });
   });
 
+  // The admin queue showed a broken image for the photo being reviewed.
+  it('serves a pending photo to an admin, even on a coral they do not own', async () => {
+    const admin = await seedUser({ id: 'admin' });
+    await testPool.query('UPDATE public."User" SET "isAdmin" = true WHERE id = $1', [admin.id]);
+    const frag = await seedCoral({ ownerId: null });
+    const key = await photoOn(frag.id, 'pending', 'k-review');
+
+    expect(await resolvePhotoAccess(key, admin.id)).toEqual({ ok: true, status: 'pending' });
+  });
+
+  it('still refuses a rejected photo to an admin', async () => {
+    const admin = await seedUser({ id: 'admin2' });
+    await testPool.query('UPDATE public."User" SET "isAdmin" = true WHERE id = $1', [admin.id]);
+    const coral = await seedCoral({ ownerId: owner.id });
+    const key = await photoOn(coral.id, 'rejected', 'k-rejected-admin');
+
+    expect(await resolvePhotoAccess(key, admin.id)).toEqual({ ok: false });
+  });
+
   it('refuses a key that matches no photo', async () => {
     expect(await resolvePhotoAccess('specimens/nobody/nothing.jpg', owner.id)).toEqual({
       ok: false,
