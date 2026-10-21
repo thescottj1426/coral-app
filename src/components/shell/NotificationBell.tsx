@@ -28,17 +28,23 @@ export function NotificationBell() {
   const [items, setItems] = useState<NotificationRow[]>([]);
   const [opened, setOpened] = useState(false);
 
+  // No interval: any query inside Neon's 5-min idle window keeps the compute awake,
+  // so a forgotten tab polling on a timer burned the whole free-tier quota.
   useEffect(() => {
-    getUnreadCount().then(setCount).catch(() => {});
-    const interval = setInterval(() => {
-      getUnreadCount().then(setCount).catch(() => {});
-    }, 30000);
-    return () => clearInterval(interval);
+    function refresh() {
+      if (document.visibilityState === 'visible') {
+        getUnreadCount().then(setCount).catch(() => {});
+      }
+    }
+    refresh();
+    document.addEventListener('visibilitychange', refresh);
+    return () => document.removeEventListener('visibilitychange', refresh);
   }, []);
 
   function handleOpen(isOpen: boolean) {
     setOpened(isOpen);
     if (isOpen) {
+      getUnreadCount().then(setCount).catch(() => {});
       getMyNotifications().then(setItems).catch(() => {});
     }
   }
