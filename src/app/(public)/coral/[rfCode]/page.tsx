@@ -12,7 +12,13 @@ import { siteUrl } from '@/lib/siteUrl';
 import type { LineageNode } from '@/app/actions/lineage';
 import type { PublicSpecimenStub } from '@/app/actions/specimens';
 
-export const revalidate = 60;
+export const revalidate = 3600;
+
+// Without this the route renders per request and `revalidate` is ignored, so
+// every crawler hit queried Neon. An empty list caches each page on first visit.
+export async function generateStaticParams() {
+  return [];
+}
 
 interface Props {
   params: Promise<{ rfCode: string }>;

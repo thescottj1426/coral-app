@@ -79,9 +79,9 @@ export async function reviewPhoto(
 
   revalidatePath('/admin/photos');
 
-  // The home page is force-dynamic, so it needs nothing. /explore and the
-  // coral's public page still cache for 60s, and a reviewer who just approved
-  // a photo will look at the coral immediately.
+  // Home, /explore and the coral's public page cache for an hour, and a
+  // reviewer who just approved a photo will look at the coral immediately.
+  revalidatePath('/');
   revalidatePath('/explore');
   if (rows[0]?.rfCode) revalidatePath(`/coral/${rows[0].rfCode}`);
 }
