@@ -351,6 +351,7 @@ export async function updateSpecimen(id: string, data: {
   invariant('specimen.update_matched_no_rows', res.rowCount === 1, { specimenId: id });
   revalidatePath('/collection');
   revalidatePath(`/collection/${id}`);
+  revalidatePath('/coral/[rfCode]', 'page');
 }
 
 export type PublicSpecimenStub = {
@@ -431,6 +432,7 @@ export async function deleteSpecimen(
 
   revalidatePath('/collection');
   revalidatePath(`/collection/${id}`);
+  revalidatePath('/coral/[rfCode]', 'page');
 }
 
 /** Bring a coral back to ALIVE — undo for an accidental removal. */
@@ -454,6 +456,7 @@ export async function restoreSpecimen(id: string): Promise<{ error?: string }> {
 
   revalidatePath('/collection');
   revalidatePath(`/collection/${id}`);
+  revalidatePath('/coral/[rfCode]', 'page');
   return {};
 }
 

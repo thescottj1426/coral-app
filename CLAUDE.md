@@ -1,4 +1,5 @@
 @AGENTS.md
+@docs/rules/database-load.md
 
 # Polyp — Claude working rules
 
@@ -11,7 +12,7 @@
 
 | Layer | Detail |
 |---|---|
-| **Next.js 16 App Router** | `params` is `Promise<{...}>` — always `await params`. Pages reading live DB data need `export const dynamic = 'force-dynamic'`. |
+| **Next.js 16 App Router** | `params` is `Promise<{...}>` — always `await params`. Signed-in pages reading per-user data use `export const dynamic = 'force-dynamic'`. **Public pages never do**: they use `revalidate = 3600` (+ `generateStaticParams` returning `[]` on dynamic routes). See `docs/rules/database-load.md`. |
 | **React 19** | Cannot pass functions as props from Server → Client. Use `<Link href="..."><Button component="a">` pattern instead of `Button component={Link}`. |
 | **Mantine v9** | CSS vars are `--mantine-color-ocean-6` etc. Layout via `Paper withBorder`, `Stack`, `Group`. No Tailwind ever. |
 | **Neon Postgres** | Raw SQL only — `pool.query<T>()` from `@/lib/db`. No Prisma. All mutations in `src/app/actions/` as `'use server'` functions. |

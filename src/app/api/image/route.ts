@@ -10,9 +10,9 @@ export async function GET(request: NextRequest) {
   if (!key) return new NextResponse('Missing key', { status: 400 });
 
   // Resolved before the session is fetched: an approved photo is public, and
-  // most requests are for approved photos.
-  const viewerId = await currentUserId(request);
-  const access = await resolvePhotoAccess(key, viewerId);
+  // most requests are for approved photos. Only a miss pays for the viewer.
+  let access = await resolvePhotoAccess(key, null);
+  if (!access.ok) access = await resolvePhotoAccess(key, await currentUserId(request));
 
   // 404, never 403 — a 403 confirms the key names a real photo.
   if (!access.ok) return new NextResponse('Not found', { status: 404 });
@@ -27,7 +27,10 @@ export async function GET(request: NextRequest) {
     );
     return NextResponse.redirect(url, {
       status: 302,
-      headers: { 'Cache-Control': 'public, max-age=3600' },
+      // s-maxage lets Vercel's CDN answer repeat requests without running this
+      // route or touching the database. Both ages together stay under the
+      // signed URL's 3600s lifetime, so no cache hands out an expired link.
+      headers: { 'Cache-Control': 'public, max-age=1800, s-maxage=1800' },
     });
   }
 
