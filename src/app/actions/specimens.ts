@@ -8,7 +8,9 @@ import { sendEmail } from '@/lib/email';
 import { welcomeTemplate } from '@/lib/emailTemplates';
 import { uniqueRFCode } from '@/lib/rfCode';
 import { checkSpecimenCap } from '@/lib/entitlements';
+import * as log from '@/lib/log';
 import { invariant } from '@/lib/log';
+import { recordOwnershipEvent } from '@/lib/ownershipEvents';
 
 export type CoralStage =
   | 'MOTHER_COLONY' | 'COLONY' | 'MINI_COLONY' | 'FRAG' | 'MICRO_FRAG';
@@ -115,6 +117,13 @@ export async function createSpecimen(data: {
   );
 
   const specimen = rows[0];
+  await recordOwnershipEvent({
+    coralId: specimen.id,
+    eventType: 'ACQUIRED',
+    userId: user.id,
+    source: 'added',
+    notes: data.vendor ? `From ${data.vendor}` : null,
+  });
 
   // Linking to a coral the user already owns. Snapshot the parent's stage at
   // cut time so the claim stays truthful after the parent grows and is edited.
@@ -154,7 +163,7 @@ export async function createSpecimen(data: {
   );
   if (parseInt(countRows[0].count, 10) === 1) {
     sendEmail(user.email, 'Your collection has started 🪸', welcomeTemplate(user.name ?? user.email))
-      .catch((err) => console.error('[specimens] welcome email failed:', err));
+      .catch((err) => log.error('email.send_failed', { recipient: log.maskEmail(user.email), reason: String(err) }));
   }
 
   return specimen;
@@ -421,9 +430,9 @@ export async function deleteSpecimen(
   const eventType = status === 'SOLD' ? 'SOLD' : status === 'GIVEN' ? 'GIFTED' : 'OBSERVATION';
 
   const audit = await pool.query(
-    `INSERT INTO public."CoralOwnershipEvent" (id, "coralId", "eventType", date, notes, "createdAt")
-     VALUES (gen_random_uuid()::text, $1, $2::"CoralEventType", NOW(), $3, NOW())`,
-    [id, eventType, note ?? `Marked ${status.toLowerCase()}`]
+    `INSERT INTO public."CoralOwnershipEvent" (id, "coralId", "eventType", "userId", date, notes, "createdAt")
+     VALUES (gen_random_uuid()::text, $1, $2::"CoralEventType", $3, NOW(), $4, NOW())`,
+    [id, eventType, user.id, note ?? `Marked ${status.toLowerCase()}`]
   );
   invariant('specimen.ownership_event_not_written', audit.rowCount === 1, {
     specimenId: id,

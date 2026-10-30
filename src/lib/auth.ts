@@ -1,6 +1,7 @@
 import { betterAuth } from 'better-auth';
 import { Pool } from '@neondatabase/serverless';
 import { sendEmail } from './email';
+import * as log from './log';
 import { verifyTemplate, resetTemplate, welcomeTemplate } from './emailTemplates';
 import { authBaseUrl, googleConfigured, trustedOrigins } from './authUrl';
 
@@ -66,7 +67,6 @@ export const auth = betterAuth({
                    "updatedAt" = NOW()`,
                 [user.id, user.id, username, user.email]
               );
-              await sendEmail(user.email, `Welcome to Coral Chest`, welcomeTemplate(username));
               break;
             } catch (e) {
               // Postgres surfaces the violated index in `constraint`; a retry
@@ -82,6 +82,11 @@ export const auth = betterAuth({
               }
             }
           }
+          // Outside the retry loop: a thrown send error would otherwise be
+          // rethrown as if the insert failed and abort the signup.
+          await sendEmail(user.email, `Welcome to Coral Chest`, welcomeTemplate(username)).catch((e) =>
+            log.error('email.send_failed', { recipient: log.maskEmail(user.email), reason: String(e) })
+          );
         },
       },
     },

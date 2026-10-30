@@ -5,6 +5,11 @@ import { revalidatePath } from 'next/cache';
 import { auth } from '@/lib/auth';
 import { pool, queryOne } from '@/lib/db';
 import { imageProxyUrl } from '@/lib/s3';
+import { sendEmail, type SendResult } from '@/lib/email';
+import { broadcastTemplate } from '@/lib/emailTemplates';
+import { unsubscribeToken } from '@/lib/unsubscribe';
+import { siteUrl } from '@/lib/siteUrl';
+import * as log from '@/lib/log';
 
 async function getCurrentAdmin() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -194,4 +199,136 @@ export async function getAdminStats(): Promise<AdminStats> {
     totalUsers: parseInt(r.totalUsers, 10),
     totalCorals: parseInt(r.totalCorals, 10),
   };
+}
+
+export async function getVerifiedUsers(): Promise<string[]> {
+  await getCurrentAdmin();
+  const { rows } = await pool.query<{ username: string }>(
+    `SELECT username FROM public."User" WHERE verified = true ORDER BY username`
+  );
+  return rows.map((r) => r.username);
+}
+
+/** "Verified farm" on every coral descended from this user's colonies. */
+export async function setUserVerified(username: string, verified: boolean): Promise<{ error?: string }> {
+  await getCurrentAdmin();
+  const res = await pool.query(
+    `UPDATE public."User" SET verified = $1, "updatedAt" = NOW() WHERE lower(username) = lower($2)`,
+    [verified, username.trim().replace(/^@/, '')]
+  );
+  if (res.rowCount !== 1) return { error: `No user @${username.trim().replace(/^@/, '')}` };
+  revalidatePath('/admin');
+  revalidatePath('/coral/[rfCode]', 'page');
+  return {};
+}
+
+export type BroadcastAudience = { kind: 'all' } | { kind: 'usernames'; usernames: string[] };
+
+// Resend's free plan allows 100 emails a day; a bigger send fails partway through.
+const MAX_RECIPIENTS = 100;
+// Resend's default rate limit is 2 requests a second.
+const SEND_GAP_MS = 600;
+
+type Recipient = { id: string; email: string; username: string };
+
+async function resolveRecipients(audience: BroadcastAudience) {
+  const names = audience.kind === 'usernames'
+    ? [...new Set(audience.usernames.map((u) => u.trim().replace(/^@/, '').toLowerCase()).filter(Boolean))]
+    : [];
+  const { rows } = await pool.query<Recipient & { emailOptOut: boolean }>(
+    `SELECT id, email, username, "emailOptOut" FROM public."User"
+     WHERE email IS NOT NULL AND ($1::boolean OR lower(username) = ANY($2::text[]))
+     ORDER BY "createdAt" ASC`,
+    [audience.kind === 'all', names]
+  );
+  const found = new Set(rows.map((r) => r.username.toLowerCase()));
+  return {
+    recipients: rows.filter((r) => !r.emailOptOut),
+    optedOut: rows.filter((r) => r.emailOptOut).length,
+    unknown: names.filter((n) => !found.has(n)),
+  };
+}
+
+export type BroadcastPreview = { count: number; optedOut: number; unknown: string[]; overLimit: boolean };
+
+export async function previewBroadcastRecipients(audience: BroadcastAudience): Promise<BroadcastPreview> {
+  await getCurrentAdmin();
+  const { recipients, optedOut, unknown } = await resolveRecipients(audience);
+  return { count: recipients.length, optedOut, unknown, overLimit: recipients.length > MAX_RECIPIENTS };
+}
+
+function broadcastEmail(subject: string, body: string, userId: string) {
+  const unsubscribeUrl = `${siteUrl()}/unsubscribe?token=${encodeURIComponent(unsubscribeToken(userId))}`;
+  const oneClickUrl = `${siteUrl()}/api/unsubscribe?token=${encodeURIComponent(unsubscribeToken(userId))}`;
+  return {
+    html: broadcastTemplate(subject, body, unsubscribeUrl),
+    headers: {
+      'List-Unsubscribe': `<${oneClickUrl}>`,
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+    },
+  };
+}
+
+export async function sendTestBroadcast(subject: string, body: string): Promise<SendResult> {
+  const admin = await getCurrentAdmin();
+  const { html, headers } = broadcastEmail(subject, body, admin.id);
+  return sendEmail(admin.email, `[Test] ${subject}`, html, headers);
+}
+
+export async function sendBroadcast(
+  subject: string,
+  body: string,
+  audience: BroadcastAudience
+): Promise<{ sent: number; failed: number } | { error: string }> {
+  const admin = await getCurrentAdmin();
+  if (!subject.trim() || !body.trim()) return { error: 'Subject and message are required' };
+
+  const { recipients } = await resolveRecipients(audience);
+  if (recipients.length === 0) return { error: 'No recipients' };
+  if (recipients.length > MAX_RECIPIENTS) {
+    return { error: `${recipients.length} recipients is over the ${MAX_RECIPIENTS}/day limit` };
+  }
+
+  let sent = 0;
+  let failed = 0;
+  for (const [i, r] of recipients.entries()) {
+    if (i > 0) await new Promise((res) => setTimeout(res, SEND_GAP_MS));
+    const { html, headers } = broadcastEmail(subject, body, r.id);
+    const result = await sendEmail(r.email, subject, html, headers);
+    if (result.ok) sent++;
+    else failed++;
+  }
+
+  await pool.query(
+    `INSERT INTO public."EmailBroadcast"
+       (id, subject, body, audience, "recipientCount", "sentCount", "failedCount", "sentById")
+     VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7)`,
+    [
+      subject, body,
+      audience.kind === 'all' ? 'all' : audience.usernames.join(','),
+      recipients.length, sent, failed, admin.id,
+    ]
+  );
+  log.event('email.broadcast_sent', { recipients: recipients.length, sent, failed });
+  revalidatePath('/admin/email');
+  return { sent, failed };
+}
+
+export type BroadcastRow = {
+  id: string;
+  subject: string;
+  audience: string;
+  recipientCount: number;
+  sentCount: number;
+  failedCount: number;
+  createdAt: string;
+};
+
+export async function getBroadcastHistory(): Promise<BroadcastRow[]> {
+  await getCurrentAdmin();
+  const { rows } = await pool.query<BroadcastRow>(
+    `SELECT id, subject, audience, "recipientCount", "sentCount", "failedCount", "createdAt"
+     FROM public."EmailBroadcast" ORDER BY "createdAt" DESC LIMIT 50`
+  );
+  return rows;
 }

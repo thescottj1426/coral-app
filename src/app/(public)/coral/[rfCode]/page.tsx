@@ -8,6 +8,9 @@ import { coralIdentityGradient } from '@/theme/theme';
 import { CtaBanner } from '@/components/coral/CtaBanner';
 import { stageLabel, statusLabel, statusColor } from '@/lib/coralStage';
 import { PublicPhotos } from './PublicPhotos';
+import { getProvenance, getFamily } from '@/lib/provenance';
+import { OriginLabel, ProvenanceTimeline, FamilySection } from '@/components/coral/Provenance';
+import { TrackView } from '@/components/TrackView';
 import { siteUrl } from '@/lib/siteUrl';
 import type { LineageNode } from '@/app/actions/lineage';
 import type { PublicSpecimenStub } from '@/app/actions/specimens';
@@ -55,7 +58,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   ].filter(Boolean);
   const description = (specimen.notes?.trim() || `${specimen.name}: ${facts.join(' · ')}.`).slice(0, 300);
 
-  const ogImage = specimen.photos[0] ? `${APP_URL}${specimen.photos[0].url}` : undefined;
+  const [ancestors, family] = await Promise.all([getLineage(specimen.id), getFamily(specimen.id)]);
+  const card = new URLSearchParams({
+    title: specimen.name,
+    ...(specimen.rfCode ? { rfCode: specimen.rfCode } : {}),
+    ...(specimen.category ? { category: specimen.category } : {}),
+    ...(specimen.species ? { species: specimen.species } : {}),
+    ...(specimen.ownerUsername ? { username: specimen.ownerUsername } : {}),
+    ...(specimen.identityHue != null ? { hue: String(specimen.identityHue) } : {}),
+    ...(specimen.photos[0] ? { photo: specimen.photos[0].url } : {}),
+    gen: String(ancestors.length),
+    ...(family?.root.ownerUsername ? { origin: family.root.ownerUsername } : {}),
+    ...(family?.root.ownerVerified ? { verified: '1' } : {}),
+  });
+  const ogImage = `${APP_URL}/api/og?${card}`;
   const canonical = `${APP_URL}/coral/${specimen.rfCode ?? specimen.id}`;
 
   return {
@@ -66,10 +82,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title,
       description,
       url: canonical,
-      images: ogImage ? [{ url: ogImage, width: 1200, height: 630, alt: specimen.name }] : [],
+      images: [{ url: ogImage, width: 1200, height: 630, alt: specimen.name }],
       type: 'article',
     },
-    twitter: { card: 'summary_large_image', title, description },
+    twitter: { card: 'summary_large_image', title, description, images: [ogImage] },
   };
 }
 
@@ -170,10 +186,12 @@ export default async function PublicCoralPage({ params }: Props) {
   // claims the RF code. This is the page a frag tag's QR resolves to.
   const unclaimed = specimen.ownerId === null;
 
-  const [ancestors, children, more] = await Promise.all([
+  const [ancestors, children, more, provenance, family] = await Promise.all([
     getLineage(specimen.id),
     getChildren(specimen.id),
     specimen.ownerId ? getMoreByOwner(specimen.ownerId, specimen.id, 4) : Promise.resolve([]),
+    getProvenance(specimen),
+    getFamily(specimen.id),
   ]);
 
   const coverPhoto = specimen.photos[0] ?? null;
@@ -364,6 +382,21 @@ export default async function PublicCoralPage({ params }: Props) {
             <Text size="sm" fw={600}>{dateLabel(specimen.updatedAt ?? specimen.createdAt)}</Text>
           </Stack>
         </Group>
+        {(family || (!unclaimed && specimen.rfCode)) && (
+          <Group justify="space-between" mt="sm">
+            {family ? <OriginLabel family={family} /> : <span />}
+            {!unclaimed && specimen.rfCode && (
+              <Text
+                component="a"
+                href={`/coral/${specimen.rfCode}/certificate`}
+                size="xs" fw={600}
+                style={{ color: 'var(--mantine-primary-color-filled)', textDecoration: 'none' }}
+              >
+                Certificate →
+              </Text>
+            )}
+          </Group>
+        )}
       </Paper>
 
       {/* Claim CTA — this page is where a frag tag's QR lands */}
@@ -447,6 +480,15 @@ export default async function PublicCoralPage({ params }: Props) {
           )}
         </Paper>
       )}
+
+      {family && family.pieces > 1 && (
+        <>
+          <FamilySection family={family} coralId={specimen.id} />
+          <TrackView event="family_viewed" />
+        </>
+      )}
+
+      {!unclaimed && <ProvenanceTimeline entries={provenance} />}
 
       {/* Photos — lightbox-backed */}
       {specimen.photos.length > 1 && (

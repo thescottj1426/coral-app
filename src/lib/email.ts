@@ -1,7 +1,6 @@
 import { Resend } from 'resend';
 import * as log from './log';
 
-// Update FROM once you have coralchest.com verified in Resend.
 // onboarding@resend.dev is Resend's sandbox sender — it ONLY delivers to the
 // address that owns the Resend account, so every other recipient is rejected.
 const SANDBOX_FROM = 'onboarding@resend.dev';
@@ -14,18 +13,23 @@ const resend = process.env.RESEND_API_KEY
 
 export type SendResult = { ok: true } | { ok: false; error: string };
 
-// Kill switch: all outbound email is paused. Flip to false (or set
-// EMAILS_ENABLED=true) to resume sending.
+// Kill switch: outbound email is off unless EMAILS_ENABLED=true.
 const EMAILS_PAUSED = process.env.EMAILS_ENABLED !== 'true';
 
-export async function sendEmail(to: string, subject: string, html: string): Promise<SendResult> {
+export async function sendEmail(
+  to: string,
+  subject: string,
+  html: string,
+  headers?: Record<string, string>
+): Promise<SendResult> {
   // Recipients are masked throughout — enough to correlate a user, not enough
   // to leave PII sitting in a log store.
   const recipient = log.maskEmail(to);
 
   if (EMAILS_PAUSED) {
-    log.warn('email.paused', { recipient, subject });
-    return { ok: true };
+    // Reported as a failure: a fake success hid that verify/reset emails never went out.
+    log.error('email.send_failed', { recipient, subject, reason: 'paused' });
+    return { ok: false, error: 'Email is paused (EMAILS_ENABLED is not "true")' };
   }
 
   if (!resend) {
@@ -42,7 +46,7 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
     });
   }
 
-  const { error } = await resend.emails.send({ from: FROM, to, subject, html });
+  const { error } = await resend.emails.send({ from: FROM, to, subject, html, headers });
   if (error) {
     log.error('email.send_failed', {
       recipient,

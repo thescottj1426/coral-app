@@ -218,45 +218,30 @@ describe('claimFrag', () => {
     expect(rows[0].acquiredStage).toBe('MICRO_FRAG');
   });
 
-  // Second branch: a code that is already owned is treated as a parent tag, and
-  // claiming it cuts a NEW frag rather than transferring the original.
-  it('cuts a new frag when the code belongs to someone else', async () => {
-    const theirs = await seedCoral({ ownerId: other.id, rfCode: 'RF-TAKEN', name: 'Jason Fox' });
+  // An owned coral's RF code is public, so it used to let anyone add a child
+  // under someone else's coral without asking. That now takes a transfer code.
+  it('refuses a code that belongs to someone else and creates nothing', async () => {
+    const theirs = await seedCoral({ ownerId: other.id, rfCode: 'RF-TAKEN' });
     const res = await claimFrag('RF-TAKEN');
 
-    expect(res).not.toHaveProperty('error');
-    const claimed = res as { coralId: string; coralRfCode: string };
-    expect(claimed.coralId).not.toBe(theirs.id);
-
-    const { rows } = await testPool.query(
-      'SELECT "ownerId", name, stage, "acquiredStage" FROM public."Coral" WHERE id = $1',
-      [claimed.coralId]
-    );
-    expect(rows[0]).toMatchObject({
-      ownerId: owner.id,
-      name: 'Jason Fox',
-      stage: 'FRAG',
-      acquiredStage: 'FRAG',
-    });
-
-    // The original stays with its owner.
-    const { rows: original } = await testPool.query(
-      'SELECT "ownerId" FROM public."Coral" WHERE id = $1',
-      [theirs.id]
-    );
-    expect(original[0].ownerId).toBe(other.id);
+    expect((res as { error: string }).error).toMatch(/transfer code/i);
+    const { rows: corals } = await testPool.query('SELECT id FROM public."Coral"');
+    expect(corals.map((r) => r.id)).toEqual([theirs.id]);
+    const { rows: links } = await testPool.query('SELECT 1 FROM public."Lineage"');
+    expect(links).toHaveLength(0);
   });
 
-  it('links the new frag to the coral whose code was scanned', async () => {
-    const theirs = await seedCoral({ ownerId: other.id, rfCode: 'RF-TAKE2', stage: 'COLONY' });
-    const res = (await claimFrag('RF-TAKE2')) as { coralId: string };
+  it('records an ACQUIRED event when an unclaimed frag is claimed', async () => {
+    const parent = await seedCoral({ ownerId: other.id });
+    const frag = await seedCoral({ ownerId: null, rfCode: 'RF-EVT1' });
+    await linkLineage(parent.id, frag.id);
 
+    await claimFrag('RF-EVT1');
     const { rows } = await testPool.query(
-      'SELECT "parentId", "parentStageAtCut" FROM public."Lineage" WHERE "childId" = $1',
-      [res.coralId]
+      'SELECT "eventType", "userId", source FROM public."CoralOwnershipEvent" WHERE "coralId" = $1',
+      [frag.id]
     );
-    expect(rows[0].parentId).toBe(theirs.id);
-    expect(rows[0].parentStageAtCut).toBe('COLONY');
+    expect(rows).toEqual([{ eventType: 'ACQUIRED', userId: owner.id, source: 'rf_claim' }]);
   });
 
   // Your own coral is the one case the parent branch refuses: cutting a frag

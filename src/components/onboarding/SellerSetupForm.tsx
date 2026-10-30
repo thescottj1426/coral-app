@@ -75,7 +75,7 @@ export function SellerSetupForm() {
           Set up your shop
         </Title>
         <Text c="dimmed" size="sm" mt={4}>
-          This is your page in the Farmers directory.
+          Shown on your public profile.
         </Text>
       </div>
 

@@ -1,0 +1,12 @@
+.previewPane {
+  overflow: hidden;
+  min-height: 480px;
+  display: flex;
+}
+
+.previewFrame {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: #f8f9fa;
+}
