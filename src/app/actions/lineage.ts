@@ -145,6 +145,7 @@ export async function claimFrag(rfCode: string): Promise<{ coralId: string; cora
     );
     revalidatePath('/collection');
     revalidatePath('/dashboard');
+    revalidatePath('/', 'layout');
     return { coralId: fragRows[0].id, coralRfCode: fragRows[0].rfCode };
   }
 
@@ -203,6 +204,7 @@ export async function claimFrag(rfCode: string): Promise<{ coralId: string; cora
 
   revalidatePath('/collection');
   revalidatePath('/dashboard');
+  revalidatePath('/', 'layout');
   return { coralId: child.id, coralRfCode: child.rfCode };
 }
 
@@ -297,6 +299,7 @@ export async function createFrags(
   }
 
   if (opts?.keepForSelf) revalidatePath('/collection');
+  revalidatePath('/', 'layout');
   return created;
 }
 
@@ -348,6 +351,7 @@ export async function claimParent(childId: string, parentRfCode: string): Promis
 
   revalidatePath(`/collection/${childId}/pedigree`);
   revalidatePath(`/collection/${parentRfCode}/pedigree`);
+  revalidatePath('/', 'layout');
   return {};
 }
 
@@ -379,6 +383,6 @@ export async function setFragRecipient(coralId: string, recipient: string): Prom
     `UPDATE public."Coral" SET "givenTo" = $1, "updatedAt" = NOW() WHERE id = $2`,
     [value || null, coralId]
   );
-  revalidatePath(`/coral/${coralId}`);
+  revalidatePath('/', 'layout');
   return {};
 }

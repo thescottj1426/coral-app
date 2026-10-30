@@ -11,10 +11,9 @@ import styles from './home.module.css';
 
 const BASE = siteUrl();
 
-// Cached for an hour, not rendered per request. Crawlers and link previews hit
-// this page all day, and each render woke Neon; any interval under its 5-minute
-// idle window keeps the compute on 24/7. Photo review revalidates '/' itself.
-export const revalidate = 3600;
+// Cached until a mutation calls revalidatePath('/', 'layout'). Crawlers hit
+// this page all day, so a time-based expiry woke Neon once per interval.
+export const revalidate = false;
 
 export const metadata: Metadata = {
   title: 'Coral Chest — trace the lineage of every coral',
