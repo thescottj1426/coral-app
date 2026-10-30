@@ -3,7 +3,7 @@ import { testPool, truncateAll } from '@/test/db';
 import { seedUser, seedCoral, linkLineage, resetSequence } from '@/test/factories';
 
 const revalidatePath = vi.fn();
-vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidatePath(p) }));
+vi.mock('next/cache', () => ({ revalidatePath: (...a: unknown[]) => revalidatePath(...a) }));
 
 vi.mock('@/lib/db', async () => {
   const { testPool: tp } = await import('@/test/db');
@@ -59,16 +59,10 @@ describe('reviewPhoto', () => {
     expect(rows[0].reviewedBy).toBe(admin.id);
   });
 
-  it('revalidates explore', async () => {
+  it('revalidates the public pages', async () => {
     const { photoId } = await pendingPhoto('RF-REV3');
     await reviewPhoto(photoId, 'approved');
-    expect(revalidatePath).toHaveBeenCalledWith('/explore');
-  });
-
-  it("revalidates the coral's own public page", async () => {
-    const { photoId } = await pendingPhoto('RF-REV4');
-    await reviewPhoto(photoId, 'approved');
-    expect(revalidatePath).toHaveBeenCalledWith('/coral/RF-REV4');
+    expect(revalidatePath).toHaveBeenCalledWith('/', 'layout');
   });
 
   it('still revalidates the review queue', async () => {
@@ -82,8 +76,7 @@ describe('reviewPhoto', () => {
   it('revalidates on rejection as well', async () => {
     const { photoId } = await pendingPhoto('RF-REV6');
     await reviewPhoto(photoId, 'rejected', 'blurry');
-    expect(revalidatePath).toHaveBeenCalledWith('/explore');
-    expect(revalidatePath).toHaveBeenCalledWith('/coral/RF-REV6');
+    expect(revalidatePath).toHaveBeenCalledWith('/', 'layout');
   });
 
   it('refuses a non-admin', async () => {

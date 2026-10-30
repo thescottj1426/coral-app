@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { getExploreSpecimens, getExploreCollectors } from '@/app/actions/explore';
 import { ExploreClient } from './ExploreClient';
 
-export const revalidate = 3600;
+export const revalidate = false;
 
 export const metadata: Metadata = {
   title: 'Explore corals and keepers',
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export default async function ExplorePage() {
   // This page is statically generated, so these run at build time. Unguarded,
   // a database blip fails the whole deploy — and CI cannot build at all
-  // without a connection string. Fall back to empty; ISR refills within the hour.
+  // without a connection string. Fall back to empty; the next mutation refills it.
   const [specimens, collectors] = await Promise.all([
     getExploreSpecimens().catch(() => []),
     getExploreCollectors().catch(() => []),

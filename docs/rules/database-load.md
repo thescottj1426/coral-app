@@ -17,11 +17,12 @@ Neon bills compute by the hour and only scales to zero after **5 minutes with no
   3. Push (server-sent events, websockets, a realtime service). It's pricier to run, so discuss it first.
   4. Polling, as a last resort: only while the tab is visible, an interval of at least 60s with backoff, stop after inactivity, and **ask first**.
 
-### 2. Public pages are cached, never per-request
-- Pages anyone can reach (home, `/explore`, `/coral/[rfCode]`, anything in the sitemap) get crawled constantly. Use `export const revalidate = 3600` (anything **over 300**), never `force-dynamic`.
-- Dynamic routes also need `generateStaticParams` (return `[]`). Otherwise Next renders them per request and ignores `revalidate`.
-- Mutations that change public content call `revalidatePath(...)` for those pages. Don't shorten the cache to compensate.
-- Check `npm run build`: public routes must show `○` or `●` with a Revalidate time, not `ƒ`.
+### 2. Public pages are cached, never per-request, never on a timer
+- Pages anyone can reach (home, `/explore`, `/coral/[rfCode]`, anything in the sitemap) get crawled constantly. Use `export const revalidate = false`, never `force-dynamic` and never a number.
+- **Oct 2026:** with `revalidate = 3600`, crawlers triggered a rebuild every 61 minutes, which woke Neon about 24 times a day (about 2h of compute) with nothing changed.
+- Dynamic routes also need `generateStaticParams` (return `[]`). Otherwise Next renders them per request.
+- Every mutation that changes public content (corals, lineage, approved photos) calls `revalidatePath('/', 'layout')`. That is the only way those pages refresh, so a missed call means stale pages until the next one.
+- Check `npm run build`: public routes must show `○` or `●`, not `ƒ`.
 
 ### 3. Hot routes don't query per request
 - Routes hit once per image, avatar or asset (`/api/image`) must let the CDN cache them (`s-maxage`) and skip session and user lookups unless they're actually needed.

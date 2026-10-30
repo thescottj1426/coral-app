@@ -5,8 +5,8 @@ import { siteUrl } from '@/lib/siteUrl';
 
 const BASE = siteUrl();
 
-// Regenerate hourly so newly added corals get discovered without a redeploy.
-export const revalidate = 3600;
+// Regenerated when a mutation calls revalidatePath('/', 'layout'), not on a timer.
+export const revalidate = false;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPages: MetadataRoute.Sitemap = [
