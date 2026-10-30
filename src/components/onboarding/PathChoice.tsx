@@ -23,9 +23,9 @@ const HOBBYIST_BULLETS = [
 ];
 
 const SELLER_BULLETS = [
-  'Shop page in the Farmers directory',
-  'List frags for sale or trade',
-  'Eligible for the Verified badge',
+  'Shop profile on your public page',
+  'Hand buyers transfer codes so frags arrive with their history',
+  'Eligible for the Verified farm badge',
 ];
 
 function PathCard({
@@ -107,7 +107,7 @@ export function PathChoice({ selected, onSelect, onContinue }: PathChoiceProps) 
         <PathCard
           icon={<IconDroplet size={19} />}
           title="Hobbyist"
-          desc="Catalog your tanks and corals, trace lineage, follow other reefers."
+          desc="Catalog your corals, trace lineage, follow other reefers."
           bullets={HOBBYIST_BULLETS}
           badge={
             selected === 'hobbyist' ? (
@@ -123,7 +123,7 @@ export function PathChoice({ selected, onSelect, onContinue }: PathChoiceProps) 
         <PathCard
           icon={<IconTruck size={19} />}
           title="Seller"
-          desc="Everything in Hobbyist, plus a shop profile and listings."
+          desc="Everything in Hobbyist, plus a shop profile and transfer codes."
           bullets={SELLER_BULLETS}
           badge={
             selected === 'seller' ? (

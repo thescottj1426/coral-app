@@ -42,6 +42,8 @@ export const testPool = new Pool({ connectionString: TEST_DATABASE_URL });
  * order keeps intent obvious. Everything else on the branch is left alone.
  */
 const OWNED_TABLES = [
+  'TransferCodeAttempt',
+  'TransferCode',
   'CoralOwnershipEvent',
   'CoralPhoto',
   'Lineage',

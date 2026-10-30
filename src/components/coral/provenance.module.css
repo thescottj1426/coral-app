@@ -1,0 +1,61 @@
+.eyebrow {
+  display: block;
+  margin-bottom: 12px;
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mantine-color-dimmed);
+}
+
+.link {
+  color: var(--mantine-primary-color-filled);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 18px;
+  border-left: 2px solid var(--mantine-color-default-border);
+}
+
+.step {
+  position: relative;
+  padding: 0 0 14px 4px;
+}
+
+.step:last-child {
+  padding-bottom: 0;
+}
+
+.dot {
+  position: absolute;
+  left: -25px;
+  top: 5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--mantine-color-ocean-5);
+  border: 2px solid var(--mantine-color-body);
+}
+
+.keeper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: inherit;
+  text-decoration: none;
+}
+
+.count {
+  color: var(--mantine-color-dimmed);
+  font-weight: 500;
+}

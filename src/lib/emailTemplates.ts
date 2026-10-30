@@ -37,7 +37,9 @@ const FOOTER = `
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.coralchest.com';
 const APP_NAME = 'Coral Chest';
 
-function shell(title: string, body: string) {
+const DEFAULT_FOOTER = `You received this because you have a ${APP_NAME} account. If you didn't request this, you can safely ignore it.`;
+
+function shell(title: string, body: string, footer = DEFAULT_FOOTER) {
   return `<!DOCTYPE html><html><body style="${BASE}">
 <div style="${CARD}">
   <div style="${HEADER}">
@@ -48,7 +50,7 @@ function shell(title: string, body: string) {
     ${body}
   </div>
   <div style="${FOOTER}">
-    You received this because you have a ${APP_NAME} account. If you didn't request this, you can safely ignore it.
+    ${footer}
   </div>
 </div>
 </body></html>`;
@@ -77,6 +79,29 @@ export function resetTemplate(url: string) {
       Or copy this link: <a href="${url}" style="color:#1b3a78;">${url}</a>
     </p>
   `);
+}
+
+function escapeHtml(s: string) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/** Plain text in, HTML out: blank lines become paragraphs, bare URLs become links. */
+export function broadcastTemplate(subject: string, body: string, unsubscribeUrl: string) {
+  const paragraphs = body
+    .trim()
+    .split(/\n\s*\n/)
+    .map((p) =>
+      escapeHtml(p)
+        .replace(/https?:\/\/[^\s<]+/g, (url) => `<a href="${url}" style="color:#1b3a78;">${url}</a>`)
+        .replace(/\n/g, '<br>')
+    )
+    .map((p) => `<p style="color:#495057;margin:0 0 16px;line-height:1.6;">${p}</p>`)
+    .join('\n');
+  return shell(
+    escapeHtml(subject),
+    paragraphs,
+    `You received this because you have a ${APP_NAME} account. <a href="${unsubscribeUrl}" style="color:#868e96;">Unsubscribe</a> from these updates.`
+  );
 }
 
 export function welcomeTemplate(username: string) {

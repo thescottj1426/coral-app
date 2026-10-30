@@ -1,9 +1,9 @@
 @AGENTS.md
 @docs/rules/database-load.md
 
-# Polyp — Claude working rules
+# Coral Chest — Claude working rules
 
-**App:** Polyp — coral collection, lineage tracing, object-anchored community discussions.
+**App:** Coral Chest (formerly Polyp) — coral collection, lineage tracing, transfer codes that move a frag into its buyer's collection with its history.
 **Repo:** `c:\Users\scott\workspace\coral-dex` · Solo project, owner: Scott (scottj1426@gmail.com)
 
 ---
@@ -28,7 +28,6 @@
 - Theme + helpers: `src/theme/theme.ts` — `CATEGORY_COLORS`, `coralIdentityGradient(seed)`
 - CSS vars: `--mantine-color-ocean-0` … `9`, `--mantine-primary-color-filled`
 - **Custom styles go in CSS modules** (`*.module.css`) — never a blob of inline styles for anything reused
-- Anchor-type colors: `anchorTile(hue)` / `anchorInk(hue)` / `anchorWash(hue)` from `@/lib/anchorTypes.ts`
 
 Before building any new UI screen, pull the design spec:
 ```
@@ -40,27 +39,31 @@ claude_design MCP → get_file → project 019e21a9-dcba-74c4-bf57-7860ae97235d
 ## File map
 
 ```
-src/app/(auth)/              sign-in, sign-up
-src/app/(dashboard)/         all authenticated pages
-src/app/actions/             server actions — discussions.ts, specimens.ts, …
-src/app/api/                 image proxy (/api/image), auth routes
+src/app/(auth)/              sign-in, sign-up, onboarding, password reset
+src/app/(dashboard)/         authenticated pages — collection, claim, feed, explore, search, users
+src/app/(public)/            cached public pages — /coral/[rfCode], /explore
+src/app/(admin)/admin/       photo queue, reports, email users
+src/app/actions/             server actions — specimens, lineage, admin, users, feed, notifications, listings
+src/app/api/                 image proxy (/api/image), upload, og image, health, unsubscribe, auth
 src/components/
-  discussion/                DiscussHub, DiscussionBoard, ThreadComposer, AnchorCard, ReplyItem, …
-  shell/                     AppNav, AppShell wrapper
+  coral/ specimen/ profile/  coral cards, add/edit forms, profile pieces
+  shell/                     AppHeader, AppShellWrapper, NotificationBell
 src/lib/
-  anchorTypes.ts             AnchorType union, ANCHOR_TYPE_CONFIG, anchorTile/Ink/Wash
   auth.ts                    better-auth instance
   db.ts                      Neon pool
+  email.ts emailTemplates.ts Resend sender (off unless EMAILS_ENABLED=true) and templates
+  rfCode.ts                  public RF codes (4 chars, NOT secret — never use as a claim credential)
 src/theme/theme.ts           Mantine theme, category colors, identity gradient
+scripts/migrate-*.mjs        idempotent migrations — run on a Neon branch first
 ```
 
 ---
 
-## Discussion system (built)
+## What exists
 
-6 anchor types: `specimen | line | species | photo | listing | log`  
-Thread table columns: `anchorType TEXT`, `anchorId TEXT` (coral UUID for specimen; free-text name for all others — display uses `COALESCE(c.name, t."anchorId")`).  
-Routes: `/discuss`, `/collection/[id]/discussion/[threadId]`
+- **Lineage:** `Lineage(parentId, childId)`; frags are cut with `createFrags` and stay `ownerId` NULL until claimed by RF code.
+- **Comments:** per-coral comments (`CommentSection`). There is no thread/discussion system — `/discuss` does not exist.
+- **Ownership history:** `CoralOwnershipEvent`, append-only.
 
 ---
 

@@ -31,6 +31,7 @@ import { FollowButton } from '@/components/profile/FollowButton';
 import { coralIdentityGradient } from '@/theme/theme';
 import { CategoryBadge } from '@/components/coral/CategoryBadge';
 import { ProfileTabs } from './ProfileTabs';
+import { getProfileTags, PROFILE_TAG_LABELS } from '@/lib/profileTags';
 import css from './profile.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -69,10 +70,11 @@ export default async function UserProfilePage({
 
   const own = session?.user?.id === p.id;
   const viewerId = session?.user?.id ?? null;
-  const [specimens, bloodlines, isFollowing] = await Promise.all([
+  const [specimens, bloodlines, isFollowing, tags] = await Promise.all([
     getUserSpecimens(p.id),
     getUserBloodlines(p.id),
     viewerId && !own ? getIsFollowing(p.id) : Promise.resolve(false),
+    getProfileTags(p.id),
   ]);
 
   const displayName = p.displayName ?? p.username;
@@ -343,6 +345,11 @@ export default async function UserProfilePage({
                 <IconCalendar size={13} />
                 Joined {new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
               </span>
+              {tags.map((t) => (
+                <Badge key={t} variant="light" color="grape" size="sm" title={PROFILE_TAG_LABELS[t].hint} style={{ textTransform: 'none' }}>
+                  {PROFILE_TAG_LABELS[t].label}
+                </Badge>
+              ))}
             </div>
           </div>
           <div className={css.actions}>

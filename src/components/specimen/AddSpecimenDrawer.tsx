@@ -80,6 +80,7 @@ export function AddSpecimenDrawer({ opened, onClose, onSubmit, ownCorals = [] }:
   const [loading, setLoading] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [skipPhotoAsked, setSkipPhotoAsked] = useState(false);
   const form = useForm<FormValues>({
     validate: schemaResolver(schema),
     initialValues: {
@@ -116,6 +117,7 @@ export function AddSpecimenDrawer({ opened, onClose, onSubmit, ownCorals = [] }:
     if (preview) URL.revokeObjectURL(preview);
     setPendingFile(null);
     setPreview(null);
+    setSkipPhotoAsked(false);
   }
 
   function handleClose() {
@@ -125,6 +127,11 @@ export function AddSpecimenDrawer({ opened, onClose, onSubmit, ownCorals = [] }:
   }
 
   async function handleSubmit(values: FormValues) {
+    if (!pendingFile && !skipPhotoAsked) {
+      setSkipPhotoAsked(true);
+      track('photo_nudge_shown');
+      return;
+    }
     setLoading(true);
     try {
       let photoUrl: string | undefined;
@@ -403,12 +410,28 @@ export function AddSpecimenDrawer({ opened, onClose, onSubmit, ownCorals = [] }:
           </div>
 
           <Box pt={4}>
+            {skipPhotoAsked && !pendingFile && (
+              <Text size="sm" c="orange" mb="xs">
+                Add it without a photo? Corals with photos get noticed in Explore.{' '}
+                <Text
+                  component="label"
+                  htmlFor="specimen-photo-input"
+                  span
+                  size="sm"
+                  fw={600}
+                  c="ocean"
+                  style={{ cursor: 'pointer' }}
+                >
+                  Add a photo
+                </Text>
+              </Text>
+            )}
             <Group gap="sm">
               <Button variant="default" style={{ flex: 1 }} onClick={handleClose}>
                 Cancel
               </Button>
               <Button type="submit" style={{ flex: 2 }} loading={loading}>
-                {loading ? 'Uploading…' : 'Add specimen'}
+                {loading ? 'Uploading…' : skipPhotoAsked && !pendingFile ? 'Add without photo' : 'Add specimen'}
               </Button>
             </Group>
           </Box>

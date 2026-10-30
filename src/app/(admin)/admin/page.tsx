@@ -6,8 +6,10 @@ import {
   IconUsers,
   IconSeeding,
   IconChevronRight,
+  IconMail,
 } from '@tabler/icons-react';
-import { getAdminStats } from '@/app/actions/admin';
+import { getAdminStats, getVerifiedUsers } from '@/app/actions/admin';
+import { VerifiedFarms } from './VerifiedFarms';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +23,7 @@ const EYEBROW: React.CSSProperties = {
 };
 
 export default async function AdminPage() {
-  const stats = await getAdminStats();
+  const [stats, verified] = await Promise.all([getAdminStats(), getVerifiedUsers()]);
 
   const kpis = [
     { label: 'Pending Photos', value: stats.pendingPhotos, icon: IconPhoto, color: 'yellow', href: '/admin/photos' },
@@ -85,7 +87,19 @@ export default async function AdminPage() {
               Review Reports ({stats.openReports})
             </Button>
           </Link>
+          <Link href="/admin/email" style={{ textDecoration: 'none' }}>
+            <Button
+              component="a"
+              leftSection={<IconMail size={16} />}
+              rightSection={<IconChevronRight size={14} />}
+              variant="light"
+            >
+              Email users
+            </Button>
+          </Link>
         </Group>
+
+        <VerifiedFarms initial={verified} />
       </Stack>
     </Box>
   );

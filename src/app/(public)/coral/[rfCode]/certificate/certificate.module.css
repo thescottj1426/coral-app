@@ -1,0 +1,159 @@
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 16px 48px;
+}
+
+.cert {
+  background: var(--mantine-color-body);
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+  padding: 40px 44px;
+  outline: 6px double var(--mantine-color-ocean-2);
+  outline-offset: -14px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 28px;
+}
+
+.brand {
+  font-family: var(--font-sora);
+  font-weight: 700;
+  color: var(--mantine-color-ocean-7);
+}
+
+.kind {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mantine-color-dimmed);
+}
+
+.name {
+  font-family: var(--font-sora);
+  font-size: 34px;
+  line-height: 1.1;
+  margin: 0;
+}
+
+.species {
+  font-style: italic;
+  color: var(--mantine-color-dimmed);
+  margin: 4px 0 0;
+}
+
+.rf {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 15px;
+  letter-spacing: 0.1em;
+  margin: 10px 0 0;
+}
+
+.trust,
+.trustVerified {
+  display: inline-block;
+  margin: 18px 0 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--mantine-color-gray-1);
+  color: var(--mantine-color-gray-7);
+}
+
+.trustVerified {
+  background: var(--mantine-color-teal-0);
+  color: var(--mantine-color-teal-8);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px 24px;
+  margin: 28px 0;
+}
+
+.facts dt {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mantine-color-dimmed);
+}
+
+.facts dd {
+  margin: 2px 0 0;
+  font-weight: 600;
+}
+
+.section {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mantine-color-dimmed);
+  margin: 0 0 8px;
+}
+
+.chain {
+  margin: 0;
+  padding-left: 20px;
+  line-height: 1.9;
+  font-size: 14px;
+}
+
+.when {
+  color: var(--mantine-color-dimmed);
+  font-size: 12px;
+}
+
+.footer {
+  margin-top: 32px;
+  padding-top: 14px;
+  border-top: 1px solid var(--mantine-color-default-border);
+  font-size: 12px;
+  color: var(--mantine-color-dimmed);
+}
+
+@media (max-width: 600px) {
+  .cert {
+    padding: 28px 22px;
+  }
+
+  .name {
+    font-size: 26px;
+  }
+}
+
+@media print {
+  .noPrint {
+    display: none !important;
+  }
+
+  .page {
+    padding: 0;
+    max-width: none;
+  }
+
+  .cert {
+    border: none;
+    background: #fff;
+    color: #000;
+  }
+
+  /* The public layout wraps this page in the app shell; only the certificate should print. */
+  :global(body):has(.page) :global(.mantine-AppShell-header),
+  :global(body):has(.page) :global(.mantine-AppShell-navbar),
+  :global(body):has(.page) :global(.mantine-AppShell-footer) {
+    display: none !important;
+  }
+
+  :global(body):has(.page) :global(.mantine-AppShell-main) {
+    padding: 0 !important;
+  }
+}

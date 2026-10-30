@@ -12,7 +12,7 @@ import {
   TextInput,
   Stack,
 } from '@mantine/core';
-import { IconPlus, IconSearch } from '@tabler/icons-react';
+import { IconCamera, IconPlus, IconSearch } from '@tabler/icons-react';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -55,6 +55,11 @@ function SpecimenCard({ specimen }: { specimen: SpecimenRow }) {
                 {removedLabel}
               </Badge>
             </Box>
+          )}
+          {!specimen.coverPhotoUrl && !removedLabel && (
+            <span className={styles.addPhoto}>
+              <IconCamera size={12} stroke={2} /> Add photo
+            </span>
           )}
           {specimen.coverPhotoPending && (
             <Box style={{ position: 'absolute', top: 8, right: 8, zIndex: 1 }}>

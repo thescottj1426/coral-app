@@ -40,6 +40,22 @@
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.72));
 }
 
+.addPhoto {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+
 /* Card photo area — portrait ratio so phone-shot coral photos aren't cropped
    to a letterbox slice. Scales with column width across breakpoints. */
 .photoWrap {

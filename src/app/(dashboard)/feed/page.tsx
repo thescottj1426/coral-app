@@ -199,7 +199,7 @@ function RightRail() {
       </Paper>
 
       <Text size="xs" c="dimmed" px={4} style={{ lineHeight: 1.7 }}>
-        Polyp © 2026
+        Coral Chest © 2026
       </Text>
     </Stack>
   );

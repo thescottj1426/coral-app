@@ -15,9 +15,11 @@ import {
   IconScissors,
   IconTag,
   IconCamera,
+  IconArrowsExchange,
 } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useDisclosure } from '@mantine/hooks';
+import { track } from '@vercel/analytics';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { FragModal } from '@/components/specimen/FragModal';
@@ -26,6 +28,7 @@ import { ListFragModal } from '@/components/specimen/ListFragModal';
 import { PhotoLightbox } from '@/components/specimen/PhotoLightbox';
 import { restoreSpecimen } from '@/app/actions/specimens';
 import { RemoveSpecimenModal } from '@/components/specimen/RemoveSpecimenModal';
+import { TransferModal } from '@/components/specimen/TransferModal';
 import type { SpecimenDetail } from '@/app/actions/specimens';
 
 interface Props {
@@ -40,6 +43,7 @@ export function MetaStripActions({ specimen, isOwner }: Props) {
   const [listOpened, { open: openList, close: closeList }] = useDisclosure(false);
 
   const [removeOpened, { open: openRemove, close: closeRemove }] = useDisclosure(false);
+  const [transferOpened, { open: openTransfer, close: closeTransfer }] = useDisclosure(false);
   const removed = specimen.status !== 'ALIVE';
 
   async function handleRestore() {
@@ -81,6 +85,11 @@ export function MetaStripActions({ specimen, isOwner }: Props) {
         specimenId={specimen.id}
         specimenName={specimen.name}
       />
+      <TransferModal
+        opened={transferOpened}
+        onClose={closeTransfer}
+        corals={[{ id: specimen.id, label: `${specimen.name}${specimen.rfCode ? ` · ${specimen.rfCode}` : ''}` }]}
+      />
       <Group gap="xs" ml="auto">
         <Button
           variant="light"
@@ -91,6 +100,16 @@ export function MetaStripActions({ specimen, isOwner }: Props) {
         >
           Frag this specimen
         </Button>
+        {!removed && (
+          <Button
+            variant="light"
+            size="xs"
+            leftSection={<IconArrowsExchange size={12} />}
+            onClick={openTransfer}
+          >
+            Transfer
+          </Button>
+        )}
         <Button
           variant="light"
           size="xs"
@@ -138,6 +157,7 @@ export function HeroActions({ specimen, isOwner }: Props) {
   const [editOpened, { open: openEdit, close: closeEdit }] = useDisclosure(false);
 
   function handleShare() {
+    track('coral_shared');
     const url = `${window.location.origin}/collection/${specimen.rfCode ?? specimen.id}`;
     navigator.clipboard.writeText(url).then(
       () => notifications.show({ message: 'Link copied to clipboard', color: 'teal' }),

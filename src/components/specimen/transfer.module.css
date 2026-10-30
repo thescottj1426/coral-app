@@ -1,0 +1,12 @@
+.codeRow {
+  padding: 8px 12px;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+}
+
+.code {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}

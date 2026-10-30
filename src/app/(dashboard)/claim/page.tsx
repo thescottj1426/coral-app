@@ -26,6 +26,8 @@ import {
 } from '@tabler/icons-react';
 import { CoralThumb } from '@/components/coral/CoralThumb';
 import { lookupParentCoral, claimFrag, type ParentCoralInfo, type LineageNode } from '@/app/actions/lineage';
+import { lookupTransferCode, redeemTransferCode, type TransferPreview } from '@/app/actions/transfers';
+import { looksLikeTransferCode } from '@/lib/transferCode';
 import styles from '@/components/coral/coral.module.css';
 
 const EYEBROW: React.CSSProperties = {
@@ -155,6 +157,7 @@ function ClaimContent() {
   const [parent, setParent] = useState<ParentCoralInfo | null | undefined>(
     searchParams.get('code') ? undefined : undefined
   );
+  const [transfer, setTransfer] = useState<TransferPreview | null>(null);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
   const [isLooking, startLookup] = useTransition();
@@ -162,6 +165,24 @@ function ClaimContent() {
 
   const normalized = code.toUpperCase().trim();
   const blockedSelfClaim = !!parent && parent.isOwn && parent.fragKind === 'parent_coral';
+  const blockedOwned = !!parent && !parent.isOwn && parent.fragKind === 'parent_coral';
+  const blocked = blockedSelfClaim || blockedOwned;
+
+  // A transfer preview rendered through the same chain and card as an unclaimed frag.
+  const shown: ParentCoralInfo | null = transfer
+    ? {
+        id: transfer.coralId,
+        name: transfer.name,
+        species: transfer.species,
+        category: null,
+        rfCode: transfer.rfCode ?? '',
+        ownerUsername: transfer.fromUsername,
+        identityHue: null,
+        ancestors: transfer.ancestors,
+        fragKind: 'unclaimed_frag',
+        isOwn: false,
+      }
+    : parent ?? null;
 
   useEffect(() => {
     if (searchParams.get('code')) handleLookup();
@@ -172,7 +193,14 @@ function ClaimContent() {
     if (!normalized) return;
     setLookupError(null);
     setParent(undefined);
+    setTransfer(null);
     startLookup(async () => {
+      if (looksLikeTransferCode(normalized)) {
+        const res = await lookupTransferCode(normalized);
+        if ('error' in res) setLookupError(res.error);
+        else setTransfer(res);
+        return;
+      }
       const result = await lookupParentCoral(normalized);
       if (!result) {
         setLookupError(`No coral found with RF code ${normalized}`);
@@ -184,6 +212,19 @@ function ClaimContent() {
   }
 
   function handleClaim() {
+    if (transfer) {
+      setClaimError(null);
+      startClaim(async () => {
+        const result = await redeemTransferCode(normalized);
+        if ('error' in result) {
+          setClaimError(result.error);
+        } else {
+          track('transfer_code_claimed');
+          router.push(result.coralRfCode ? `/coral/${result.coralRfCode}/certificate?welcome=1` : `/collection/${result.coralId}`);
+        }
+      });
+      return;
+    }
     if (!parent) return;
     setClaimError(null);
     startClaim(async () => {
@@ -212,7 +253,7 @@ function ClaimContent() {
             Claim a frag
           </Text>
           <Text size="sm" c="dimmed" mt={4}>
-            Enter the RF code on your frag tag to inherit its full lineage.
+            Enter the transfer code from your order email, or the RF code on an unclaimed frag tag, to inherit its full lineage.
           </Text>
         </div>
 
@@ -220,15 +261,15 @@ function ClaimContent() {
 
         {/* Code input */}
         <Stack gap={8}>
-          <Text size="sm" fw={600}>RF code</Text>
+          <Text size="sm" fw={600}>Transfer code or RF code</Text>
           <Group gap={8} wrap="nowrap">
             <TextInput
               className={styles.codeInput}
-              placeholder="RF-XXXX"
+              placeholder="REEF-XXXX-XXXX"
               value={code}
-              onChange={(e) => { setCode(e.currentTarget.value); setParent(undefined); setLookupError(null); }}
+              onChange={(e) => { setCode(e.currentTarget.value); setParent(undefined); setTransfer(null); setLookupError(null); }}
               onKeyDown={(e) => e.key === 'Enter' && handleLookup()}
-              maxLength={7}
+              maxLength={16}
               style={{ flex: 1 }}
             />
             <Button onClick={handleLookup} disabled={!normalized} loading={isLooking}>
@@ -252,24 +293,31 @@ function ClaimContent() {
           </Alert>
         )}
 
+        {/* Someone else's coral — its RF code is public, so it can't hand the coral over */}
+        {blockedOwned && (
+          <Alert icon={<IconAlertCircle size={16} />} color="orange" variant="light">
+            {parent?.name} belongs to {parent?.ownerUsername ? `@${parent.ownerUsername}` : 'another keeper'}.
+            Corals change hands with a transfer code — ask the owner for one.
+          </Alert>
+        )}
+
         {/* Found */}
-        {parent && !blockedSelfClaim && (
+        {shown && !blocked && (
           <>
             <Paper p="md" style={{ background: 'var(--mantine-color-teal-0)', border: '1px solid var(--mantine-color-teal-3)' }}>
               <Group gap={12} wrap="nowrap">
-                <CoralThumb rfCode={parent.rfCode} size={48} radius={8} />
+                <CoralThumb rfCode={shown.rfCode || shown.name} size={48} radius={8} />
                 <Stack gap={4} style={{ flex: 1 }}>
-                  <Text size="sm" fw={700}>{parent.name}</Text>
-                  {parent.species && (
-                    <Text size="xs" c="dimmed" style={{ fontStyle: 'italic' }}>{parent.species}</Text>
+                  <Text size="sm" fw={700}>{shown.name}</Text>
+                  {shown.species && (
+                    <Text size="xs" c="dimmed" style={{ fontStyle: 'italic' }}>{shown.species}</Text>
                   )}
                   <Group gap={4}>
                     <IconLeaf size={11} color="var(--mantine-color-teal-7)" />
                     <Text size="xs" style={{ color: 'var(--mantine-color-teal-7)' }}>
-                      {parent.fragKind === 'unclaimed_frag'
-                        ? `Pre-registered frag · Gen ${parent.ancestors.length + 1}`
-                        : `Fragged by @${parent.ownerUsername}${parent.ancestors.length > 0 ? ` · Gen ${parent.ancestors.length + 1} lineage` : ''}`
-                      }
+                      {transfer
+                        ? `From ${transfer.fromUsername ? `@${transfer.fromUsername}` : 'the seller'} · Gen ${shown.ancestors.length + 1}`
+                        : `Pre-registered frag · Gen ${shown.ancestors.length + 1}`}
                     </Text>
                   </Group>
                 </Stack>
@@ -283,7 +331,7 @@ function ClaimContent() {
                 </ThemeIcon>
                 <Text style={EYEBROW}>lineage you&apos;ll inherit</Text>
               </Group>
-              <LineageChain parent={parent} />
+              <LineageChain parent={shown} />
               <Divider my="sm" />
               <Text size="xs" c="dimmed" ta="center">
                 This chain is permanent and cannot be modified after claiming.
@@ -304,16 +352,16 @@ function ClaimContent() {
             fullWidth
             size="md"
             style={{ height: 44 }}
-            disabled={!parent || blockedSelfClaim}
+            disabled={!shown || blocked}
             loading={isClaiming}
-            leftSection={parent && !blockedSelfClaim ? <IconCheck size={16} /> : undefined}
+            leftSection={shown && !blocked ? <IconCheck size={16} /> : undefined}
             onClick={handleClaim}
           >
-            Claim this frag
+            {transfer ? 'Add to my collection' : 'Claim this frag'}
           </Button>
-          {!parent && (
+          {!shown && (
             <Text size="xs" c="dimmed" ta="center" mt={8}>
-              Enter a valid RF code to continue
+              Enter a valid code to continue
             </Text>
           )}
         </Box>

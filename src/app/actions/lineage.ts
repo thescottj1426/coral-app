@@ -5,7 +5,7 @@ import { pool } from '@/lib/db';
 import { imageProxyUrl } from '@/lib/s3';
 import { getCurrentUser } from '@/lib/getCurrentUser';
 import { uniqueRFCode } from '@/lib/rfCode';
-import { createNotification } from '@/lib/notifications';
+import { recordOwnershipEvent } from '@/lib/ownershipEvents';
 import { checkSpecimenCap } from '@/lib/entitlements';
 import type { CoralStage } from '@/app/actions/specimens';
 import { invariant } from '@/lib/log';
@@ -134,26 +134,31 @@ export async function claimFrag(rfCode: string): Promise<{ coralId: string; cora
   );
 
   if (fragRows[0]) {
-    await pool.query(
+    // "ownerId" IS NULL in the WHERE: two people claiming the same frag at
+    // once must not both succeed.
+    const res = await pool.query(
       `UPDATE public."Coral"
          SET "ownerId" = $1,
              "acquiredStage" = COALESCE("acquiredStage", stage),
              "givenTo" = NULL,
              "updatedAt" = NOW()
-       WHERE id = $2`,
+       WHERE id = $2 AND "ownerId" IS NULL`,
       [user.id, fragRows[0].id]
     );
+    if (res.rowCount !== 1) return { error: 'Someone else just claimed this frag.' };
+    await recordOwnershipEvent({ coralId: fragRows[0].id, eventType: 'ACQUIRED', userId: user.id, source: 'rf_claim' });
     revalidatePath('/collection');
     revalidatePath('/dashboard');
     revalidatePath('/', 'layout');
     return { coralId: fragRows[0].id, coralRfCode: fragRows[0].rfCode };
   }
 
-  // Otherwise treat as a parent coral and create a child
-  const { rows: parentRows } = await pool.query<{
-    id: string; name: string; species: string | null; category: string | null; ownerId: string; stage: CoralStage | null;
-  }>(
-    `SELECT id, name, species, category, "ownerId", stage FROM public."Coral" WHERE "rfCode" = $1 AND "ownerId" IS NOT NULL`,
+  // An owned coral's RF code is public — printed on tags and pages — so it
+  // cannot be what hands over a piece of it. That takes a transfer code.
+  const { rows: parentRows } = await pool.query<{ ownerId: string; ownerUsername: string | null }>(
+    `SELECT c."ownerId", u.username AS "ownerUsername"
+     FROM public."Coral" c LEFT JOIN public."User" u ON u.id = c."ownerId"
+     WHERE c."rfCode" = $1 AND c."ownerId" IS NOT NULL`,
     [normalized]
   );
   if (!parentRows[0]) {
@@ -173,39 +178,9 @@ export async function claimFrag(rfCode: string): Promise<{ coralId: string; cora
   if (parent.ownerId === user.id) {
     return { error: 'This is your own coral — log a frag from it instead of claiming it.' };
   }
-
-  const newRfCode = await uniqueRFCode();
-  const identityHue = Math.floor(Math.random() * 360);
-
-  const { rows: childRows } = await pool.query<{ id: string; rfCode: string }>(
-    `INSERT INTO public."Coral"
-       (id, name, species, category, "rfCode", "ownerId", "identityHue",
-        stage, "acquiredStage", "updatedAt")
-     VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6,
-             'FRAG'::"CoralStage", 'FRAG'::"CoralStage", NOW())
-     RETURNING id, "rfCode"`,
-    [parent.name, parent.species ?? null, parent.category ?? null, newRfCode, user.id, identityHue]
-  );
-  const child = childRows[0];
-
-  await pool.query(
-    `INSERT INTO public."Lineage" ("parentId", "childId", "parentStageAtCut")
-     VALUES ($1, $2, $3::"CoralStage") ON CONFLICT DO NOTHING`,
-    [parent.id, child.id, parent.stage]
-  );
-
-  createNotification({
-    userId: parent.ownerId,
-    type: 'FRAG_CLAIMED',
-    fromUserId: user.id,
-    targetType: 'CORAL',
-    targetId: parent.id,
-  }).catch((err) => console.error('[lineage] frag-claimed notification failed:', err));
-
-  revalidatePath('/collection');
-  revalidatePath('/dashboard');
-  revalidatePath('/', 'layout');
-  return { coralId: child.id, coralRfCode: child.rfCode };
+  return {
+    error: `This coral belongs to ${parent.ownerUsername ? `@${parent.ownerUsername}` : 'another keeper'}. Ask them for a transfer code.`,
+  };
 }
 
 // Creates unclaimed child corals (ownerId=NULL) linked to parentId.
@@ -294,6 +269,16 @@ export async function createFrags(
        VALUES ($1, $2, $3::"CoralStage") ON CONFLICT DO NOTHING`,
       [parentId, rows[0].id, parentStage]
     );
+
+    await recordOwnershipEvent({
+      coralId: rows[0].id,
+      eventType: 'FRAGGED',
+      userId: user.id,
+      source: parent.rfCode,
+    });
+    if (ownerId) {
+      await recordOwnershipEvent({ coralId: rows[0].id, eventType: 'ACQUIRED', userId: user.id, source: 'kept_frag' });
+    }
 
     created.push({ id: rows[0].id, rfCode });
   }

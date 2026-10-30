@@ -21,8 +21,8 @@ export async function createListing(data: CreateListingData): Promise<void> {
   if (!coral || coral.ownerId !== user.id) throw new Error('Not your specimen');
 
   await pool.query(
-    `INSERT INTO public."FragListing" (id, "coralId", "userId", price, qty, notes, "createdAt")
-     VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, now())`,
+    `INSERT INTO public."FragListing" (id, "coralId", "userId", price, qty, notes, "createdAt", "updatedAt")
+     VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, now(), now())`,
     [data.coralId, user.id, data.price, data.qty, data.notes ?? null],
   );
 
