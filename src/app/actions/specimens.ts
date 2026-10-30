@@ -155,6 +155,7 @@ export async function createSpecimen(data: {
   }
 
   revalidatePath('/collection');
+  revalidatePath('/', 'layout');
 
   // Welcome email on first specimen only
   const { rows: countRows } = await pool.query<{ count: string }>(
@@ -360,7 +361,7 @@ export async function updateSpecimen(id: string, data: {
   invariant('specimen.update_matched_no_rows', res.rowCount === 1, { specimenId: id });
   revalidatePath('/collection');
   revalidatePath(`/collection/${id}`);
-  revalidatePath('/coral/[rfCode]', 'page');
+  revalidatePath('/', 'layout');
 }
 
 export type PublicSpecimenStub = {
@@ -441,7 +442,7 @@ export async function deleteSpecimen(
 
   revalidatePath('/collection');
   revalidatePath(`/collection/${id}`);
-  revalidatePath('/coral/[rfCode]', 'page');
+  revalidatePath('/', 'layout');
 }
 
 /** Bring a coral back to ALIVE — undo for an accidental removal. */
@@ -465,7 +466,7 @@ export async function restoreSpecimen(id: string): Promise<{ error?: string }> {
 
   revalidatePath('/collection');
   revalidatePath(`/collection/${id}`);
-  revalidatePath('/coral/[rfCode]', 'page');
+  revalidatePath('/', 'layout');
   return {};
 }
 

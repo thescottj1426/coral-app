@@ -66,15 +66,6 @@ export async function reviewPhoto(
 ): Promise<void> {
   const admin = await getCurrentAdmin();
 
-  // Needed to refresh the coral's own page, which is still ISR-cached.
-  const { rows } = await pool.query<{ rfCode: string | null }>(
-    `SELECT c."rfCode"
-     FROM public."CoralPhoto" p
-     JOIN public."Coral" c ON c.id = p."coralId"
-     WHERE p.id = $1`,
-    [photoId]
-  );
-
   await pool.query(
     `UPDATE public."CoralPhoto"
      SET status = $1::"PhotoStatus", "reviewedBy" = $2, "reviewedAt" = NOW(), "reviewNote" = $3
@@ -83,12 +74,7 @@ export async function reviewPhoto(
   );
 
   revalidatePath('/admin/photos');
-
-  // Home, /explore and the coral's public page cache for an hour, and a
-  // reviewer who just approved a photo will look at the coral immediately.
-  revalidatePath('/');
-  revalidatePath('/explore');
-  if (rows[0]?.rfCode) revalidatePath(`/coral/${rows[0].rfCode}`);
+  revalidatePath('/', 'layout');
 }
 
 export type ReviewedPhoto = PendingPhoto & {
@@ -218,7 +204,7 @@ export async function setUserVerified(username: string, verified: boolean): Prom
   );
   if (res.rowCount !== 1) return { error: `No user @${username.trim().replace(/^@/, '')}` };
   revalidatePath('/admin');
-  revalidatePath('/coral/[rfCode]', 'page');
+  revalidatePath('/', 'layout');
   return {};
 }
 

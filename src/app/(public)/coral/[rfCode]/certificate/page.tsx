@@ -8,7 +8,7 @@ import { stageLabel } from '@/lib/coralStage';
 import { CertificateActions, WelcomeBanner } from './CertificateClient';
 import styles from './certificate.module.css';
 
-export const revalidate = 3600;
+export const revalidate = false;
 
 export async function generateStaticParams() {
   return [];

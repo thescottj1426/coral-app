@@ -251,6 +251,6 @@ export async function redeemTransferCode(input: string): Promise<{ coralId: stri
   log.event('transfer_code.redeemed', { coralId: row!.coralId });
   revalidatePath('/collection');
   revalidatePath('/dashboard');
-  revalidatePath('/coral/[rfCode]', 'page');
+  revalidatePath('/', 'layout');
   return { coralId: row!.coralId, coralRfCode: row!.rfCode };
 }
